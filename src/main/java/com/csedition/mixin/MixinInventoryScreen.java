@@ -12,22 +12,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Стилизует InventoryScreen под шутер.
- * Заменяет стандартный фон на тёмный, рисует слоты в стиле CS.
- * Иконки предметов берутся из реестра (включая TaCZ).
- * Всё процедурно через CSRenderUtil — никаких PNG.
+ * remap = false — в Forge 1.20.1 с official mappings имена уже deobfuscated.
  */
-@Mixin(InventoryScreen.class)
+@Mixin(value = InventoryScreen.class, remap = false)
 public class MixinInventoryScreen {
 
-    @Inject(method = "renderBg", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "renderBg", at = @At("HEAD"), cancellable = true, remap = false)
     private void cs$renderBg(GuiGraphics g, float partial, int mouseX, int mouseY, CallbackInfo ci) {
         ci.cancel();
         InventoryScreen self = (InventoryScreen)(Object)this;
-        // Тёмный фон со сканлайнами
         g.fill(0, 0, self.width, self.height, 0xEE0A0A0A);
         CSRenderUtil.scanlines(g, 0, 0, self.width, self.height, 3);
 
-        // Заголовок
         var font = net.minecraft.client.Minecraft.getInstance().font;
         String title = "INVENTORY";
         int titleW = font.width(title) + 40;
@@ -35,12 +31,10 @@ public class MixinInventoryScreen {
         CSRenderUtil.cornerAccents(g, self.width / 2 - titleW / 2, 8, titleW, 24, 6, CSRenderUtil.CS_ORANGE);
         g.drawCenteredString(font, title, self.width / 2, 16, CSRenderUtil.CS_ORANGE);
 
-        // Слоты инвентаря игрока (3 ряда по 9)
         int startX = self.width / 2 - 176 / 2;
         int startY = self.height / 2 - 50;
         Player player = net.minecraft.client.Minecraft.getInstance().player;
         if (player != null) {
-            // Панель вокруг инвентаря
             CSRenderUtil.csPanel(g, startX - 6, startY - 6, 9 * 18 + 12, 3 * 18 + 12, null, font);
             CSRenderUtil.cornerAccents(g, startX - 6, startY - 6, 9 * 18 + 12, 3 * 18 + 12, 6, CSRenderUtil.CS_ORANGE);
 
@@ -56,7 +50,6 @@ public class MixinInventoryScreen {
                     }
                 }
             }
-            // Хотбар
             int hotbarY = startY + 3 * 18 + 8;
             CSRenderUtil.csPanel(g, startX - 6, hotbarY - 6, 9 * 18 + 12, 18 + 12, null, font);
             CSRenderUtil.cornerAccents(g, startX - 6, hotbarY - 6, 9 * 18 + 12, 18 + 12, 6, CSRenderUtil.CS_ORANGE);

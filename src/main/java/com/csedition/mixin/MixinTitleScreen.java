@@ -9,13 +9,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Стилизует TitleScreen под тёмную тему CS.
- * Убирает лишние кнопки, рисует тёмный фон с эффектами.
- * НЕ трогает загрузочные экраны — только главное меню.
+ * remap = false — в Forge 1.20.1 с official mappings имена уже deobfuscated.
  */
-@Mixin(TitleScreen.class)
+@Mixin(value = TitleScreen.class, remap = false)
 public class MixinTitleScreen {
 
-    @Inject(method = "init", at = @At("TAIL"))
+    @Inject(method = "init", at = @At("TAIL"), remap = false)
     private void cs$restyle(CallbackInfo ci) {
         TitleScreen self = (TitleScreen)(Object)this;
         self.clearWidgets();
@@ -35,7 +34,7 @@ public class MixinTitleScreen {
                 .bounds(cx - 120, y + 24, 240, 28).build());
     }
 
-    @Inject(method = "render", at = @At("TAIL"))
+    @Inject(method = "render", at = @At("TAIL"), remap = false)
     private void cs$render(net.minecraft.client.gui.GuiGraphics g, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         TitleScreen self = (TitleScreen)(Object)this;
         g.fill(0, 0, self.width, self.height, 0xEE050505);
