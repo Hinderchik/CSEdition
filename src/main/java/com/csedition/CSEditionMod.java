@@ -35,7 +35,8 @@ public class CSEditionMod {
                 new net.minecraftforge.common.ForgeConfigSpec.Builder().build(),
                 "csedition-common.toml");
 
-        MapConfig.load();
+        // MapConfig.load() вызывается в ServerEvents.onServerStarted,
+        // когда мир уже доступен (нужен путь к папке мира)
         LOGGER.info("[CS-Edition] Mod initialized.");
     }
 
