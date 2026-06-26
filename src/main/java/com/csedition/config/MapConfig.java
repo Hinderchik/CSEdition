@@ -6,6 +6,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import net.minecraft.core.BlockPos;
 import net.minecraftforge.fml.loading.FMLPaths;
 
@@ -22,6 +23,8 @@ import java.util.Map;
 /**
  * Загружает maps.json из config/csedition/maps.json.
  * Файл создаётся автоматически с дефолтным содержимым, если отсутствует.
+ *
+ * Устойчив к ошибкам: если одна карта в JSON битая, остальные всё равно загрузятся.
  *
  * Формат maps.json:
  * {
@@ -54,35 +57,51 @@ public class MapConfig {
                 writeDefault(file);
             }
 
-            try (Reader reader = Files.newBufferedReader(file)) {
-                JsonObject root = new Gson().fromJson(reader, JsonObject.class);
-                if (root == null) return;
+            // Читаем файл целиком в строку, чтобы безопасно парсить по частям
+            String content = Files.readString(file);
+            JsonObject root;
+            try {
+                root = new Gson().fromJson(content, JsonObject.class);
+            } catch (JsonSyntaxException e) {
+                CSEditionMod.LOGGER.error("[CS-Edition] maps.json is completely broken: {}", e.getMessage());
+                CSEditionMod.LOGGER.error("[CS-Edition] Fix the file at: {}", file);
+                return; // Не крашим мод, просто нет карт
+            }
+            if (root == null) return;
 
-                if (root.has("lobbySpawn")) {
+            if (root.has("lobbySpawn")) {
+                try {
                     lobbySpawn = parsePos(root.getAsJsonArray("lobbySpawn"));
+                } catch (Exception e) {
+                    CSEditionMod.LOGGER.warn("[CS-Edition] Bad lobbySpawn, using default");
                 }
+            }
 
-                JsonArray arr = root.getAsJsonArray("maps");
-                if (arr != null) {
-                    for (JsonElement el : arr) {
+            JsonArray arr = root.getAsJsonArray("maps");
+            if (arr != null) {
+                for (int i = 0; i < arr.size(); i++) {
+                    JsonElement el = arr.get(i);
+                    try {
                         JsonObject obj = el.getAsJsonObject();
                         String id = obj.get("id").getAsString();
                         String name = obj.has("displayName") ? obj.get("displayName").getAsString() : id;
                         List<BlockPos> tSpawns = parsePosList(obj.getAsJsonArray("tSpawns"));
                         List<BlockPos> ctSpawns = parsePosList(obj.getAsJsonArray("ctSpawns"));
-                        // Раздельные зоны закупа для T и CT
                         BlockPos tMin = parsePos(obj.getAsJsonArray("tBuyZoneMin"));
                         BlockPos tMax = parsePos(obj.getAsJsonArray("tBuyZoneMax"));
                         BlockPos ctMin = parsePos(obj.getAsJsonArray("ctBuyZoneMin"));
                         BlockPos ctMax = parsePos(obj.getAsJsonArray("ctBuyZoneMax"));
                         MAPS.put(id, new MapData(id, name, tSpawns, ctSpawns,
                                 tMin, tMax, ctMin, ctMax, lobbySpawn));
+                        CSEditionMod.LOGGER.info("[CS-Edition] Loaded map: {} ({})", id, name);
+                    } catch (Exception e) {
+                        CSEditionMod.LOGGER.error("[CS-Edition] Skipping broken map entry #{}: {}", i, e.getMessage());
                     }
                 }
-                CSEditionMod.LOGGER.info("[CS-Edition] Loaded {} maps from maps.json", MAPS.size());
             }
+            CSEditionMod.LOGGER.info("[CS-Edition] Loaded {} maps from maps.json", MAPS.size());
         } catch (IOException e) {
-            CSEditionMod.LOGGER.error("[CS-Edition] Failed to load maps.json", e);
+            CSEditionMod.LOGGER.error("[CS-Edition] Failed to read maps.json", e);
         }
     }
 
