@@ -4,7 +4,7 @@ license="MIT"
 
 [[mods]]
 modId="csedition"
-version="${version}"
+version="${mod_version}"
 displayName="CS Edition"
 description="CS-style shooter mod built on top of TaCZ for Minecraft 1.20.1"
 authors="Hinderchik"
