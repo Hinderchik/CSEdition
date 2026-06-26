@@ -59,7 +59,7 @@ public class MapConfig {
         try {
             MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
             if (server == null) return null;
-            Path worldDataDir = server.getWorldPath(LevelResource.DATA);
+            Path worldDataDir = server.getWorldPath(LevelResource.LEVEL).resolve("data");
             Path modDir = worldDataDir.resolve("csedition");
             if (!Files.exists(modDir)) Files.createDirectories(modDir);
             return modDir.resolve("maps.json");
