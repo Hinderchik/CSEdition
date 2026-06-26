@@ -72,6 +72,9 @@ public class MatchManager {
             entries.add(new PacketMapList.MapEntry(m.getId(), m.getDisplayName()));
         }
         CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new PacketMapList(entries));
+        // Отправим полный maps.json для синхронизации (клиенту не нужен свой файл)
+        CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new com.csedition.network.PacketSyncMaps(MapConfig.toJson()));
         // Отправим текущую фазу
         broadcastPhase();
         // Телепортируем в лобби

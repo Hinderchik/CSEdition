@@ -3,6 +3,7 @@ package com.csedition.config;
 import com.csedition.CSEditionMod;
 import com.csedition.data.MapData;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -11,7 +12,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,6 +25,9 @@ import java.util.Map;
  * Файл создаётся автоматически с дефолтным содержимым, если отсутствует.
  *
  * Устойчив к ошибкам: если одна карта в JSON битая, остальные всё равно загрузятся.
+ *
+ * Загружается ТОЛЬКО на сервере (dedicated или LAN/integrated).
+ * Клиенты получают карты по сети через PacketSyncMaps.
  *
  * Формат maps.json:
  * {
@@ -46,8 +49,15 @@ import java.util.Map;
 public class MapConfig {
     private static final Map<String, MapData> MAPS = new HashMap<>();
     private static BlockPos lobbySpawn = new BlockPos(0, 100, 0);
+    private static String cachedJson = null;
 
     public static void load() {
+        // На клиенте карты приходят по сети, файл не нужен
+        if (!isServerSide()) {
+            CSEditionMod.LOGGER.info("[CS-Edition] Client side — maps will be synced from server");
+            return;
+        }
+
         Path configDir = FMLPaths.CONFIGDIR.get().resolve("csedition");
         Path file = configDir.resolve("maps.json");
 
@@ -57,7 +67,6 @@ public class MapConfig {
                 writeDefault(file);
             }
 
-            // Читаем файл целиком в строку, чтобы безопасно парсить по частям
             String content = Files.readString(file);
             JsonObject root;
             try {
@@ -65,7 +74,7 @@ public class MapConfig {
             } catch (JsonSyntaxException e) {
                 CSEditionMod.LOGGER.error("[CS-Edition] maps.json is completely broken: {}", e.getMessage());
                 CSEditionMod.LOGGER.error("[CS-Edition] Fix the file at: {}", file);
-                return; // Не крашим мод, просто нет карт
+                return;
             }
             if (root == null) return;
 
@@ -105,6 +114,50 @@ public class MapConfig {
         }
     }
 
+    /**
+     * Возвращает текущее состояние карт в виде JSON-строки для отправки клиентам.
+     */
+    public static String toJson() {
+        if (cachedJson != null) return cachedJson;
+        JsonObject root = new JsonObject();
+        JsonArray lobbyArr = new JsonArray();
+        lobbyArr.add(lobbySpawn.getX());
+        lobbyArr.add(lobbySpawn.getY());
+        lobbyArr.add(lobbySpawn.getZ());
+        root.add("lobbySpawn", lobbyArr);
+
+        JsonArray mapsArr = new JsonArray();
+        for (MapData m : MAPS.values()) {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("id", m.getId());
+            obj.addProperty("displayName", m.getDisplayName());
+            obj.add("tSpawns", posListToJson(m.getTSpawns()));
+            obj.add("ctSpawns", posListToJson(m.getCtSpawns()));
+            // Зоны закупа — используем публичные геттеры
+            obj.add("tBuyZoneMin", posToJson(m.getTBuyZoneMin()));
+            obj.add("tBuyZoneMax", posToJson(m.getTBuyZoneMax()));
+            obj.add("ctBuyZoneMin", posToJson(m.getCtBuyZoneMin()));
+            obj.add("ctBuyZoneMax", posToJson(m.getCtBuyZoneMax()));
+            mapsArr.add(obj);
+        }
+        root.add("maps", mapsArr);
+
+        cachedJson = new GsonBuilder().setPrettyPrinting().create().toJson(root);
+        return cachedJson;
+    }
+
+    private static JsonArray posToJson(BlockPos p) {
+        JsonArray a = new JsonArray();
+        a.add(p.getX()); a.add(p.getY()); a.add(p.getZ());
+        return a;
+    }
+
+    private static JsonArray posListToJson(List<BlockPos> list) {
+        JsonArray arr = new JsonArray();
+        for (BlockPos p : list) arr.add(posToJson(p));
+        return arr;
+    }
+
     private static void writeDefault(Path file) throws IOException {
         try (Writer w = Files.newBufferedWriter(file)) {
             w.write("{\n" +
@@ -134,6 +187,32 @@ public class MapConfig {
         if (arr == null) return list;
         for (JsonElement el : arr) list.add(parsePos(el.getAsJsonArray()));
         return list;
+    }
+
+    /**
+     * Определяет, запущены ли мы на серверной стороне.
+     * Используется для пропуска загрузки maps.json на клиенте.
+     */
+    private static boolean isServerSide() {
+        try {
+            // На dedicated сервере FMLEnvironment.dist == Dist.DEDICATED_SERVER
+            // На LAN/integrated — DedicatedServer != null или есть мир
+            // Простейшая проверка: если есть мир и мы в нём — это сервер
+            net.minecraftforge.api.distmarker.Dist dist =
+                net.minecraftforge.fml.loading.FMLEnvironment.dist;
+            return dist.isDedicatedServer() || isLanHost();
+        } catch (Exception e) {
+            return true; // По умолчанию грузим
+        }
+    }
+
+    private static boolean isLanHost() {
+        try {
+            // На LAN/integrated сервере есть MinecraftServer
+            return net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer() != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static Map<String, MapData> getMaps() { return MAPS; }

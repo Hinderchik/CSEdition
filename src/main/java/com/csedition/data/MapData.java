@@ -41,6 +41,10 @@ public class MapData {
     public List<BlockPos> getTSpawns() { return tSpawns; }
     public List<BlockPos> getCtSpawns() { return ctSpawns; }
     public BlockPos getLobbySpawn() { return lobbySpawn; }
+    public BlockPos getTBuyZoneMin() { return tBuyZoneMin; }
+    public BlockPos getTBuyZoneMax() { return tBuyZoneMax; }
+    public BlockPos getCtBuyZoneMin() { return ctBuyZoneMin; }
+    public BlockPos getCtBuyZoneMax() { return ctBuyZoneMax; }
 
     /**
      * Проверяет, находится ли позиция внутри зоны закупа для указанной команды.

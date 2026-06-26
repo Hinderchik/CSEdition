@@ -9,6 +9,9 @@ import java.util.List;
 /**
  * Клиентское состояние, синхронизированное с сервера.
  * Сюда пишут пакеты, отсюда читает HUD и GUI.
+ *
+ * Карты (mapsJson) приходят с сервера через PacketSyncMaps.
+ * Клиенту не нужен свой maps.json — всё приходит по сети.
  */
 public class ClientState {
     private static int money = 800;
@@ -18,6 +21,7 @@ public class ClientState {
     private static int phaseTicks = 0;
     private static String currentMapId = "";
     private static List<PacketMapList.MapEntry> mapList = new ArrayList<>();
+    private static String mapsJson = "";  // Полный maps.json с сервера
 
     public static void update(int m, int k, int d) {
         money = m; kills = k; deaths = d;
@@ -31,6 +35,10 @@ public class ClientState {
         mapList = list;
     }
 
+    public static void setMapsJson(String json) {
+        mapsJson = json == null ? "" : json;
+    }
+
     public static int getMoney() { return money; }
     public static int getKills() { return kills; }
     public static int getDeaths() { return deaths; }
@@ -38,4 +46,5 @@ public class ClientState {
     public static int getPhaseTicks() { return phaseTicks; }
     public static String getCurrentMapId() { return currentMapId; }
     public static List<PacketMapList.MapEntry> getMapList() { return mapList; }
+    public static String getMapsJson() { return mapsJson; }
 }
