@@ -102,7 +102,7 @@ public class CSCommand {
                                 .then(Commands.argument("team", StringArgumentType.string())
                                         .executes(ctx -> setBuyZone(ctx,
                                                 StringArgumentType.getString(ctx, "mapId"),
-                                                StringArgumentType.getString(ctx, "team")))))
+                                                StringArgumentType.getString(ctx, "team"))))))
                 .then(Commands.literal("reload").executes(this::reload))
         );
     }
