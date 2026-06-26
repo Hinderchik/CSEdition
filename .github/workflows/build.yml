@@ -8,6 +8,9 @@ on:
     branches: [ main, master, develop ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,19 +41,28 @@ jobs:
       - name: Build with Gradle
         run: gradle build --no-daemon
 
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cs-edition-jar
-          path: build/libs/*.jar
-          if-no-files-found: error
+      - name: List built JARs
+        run: ls -la build/libs/
 
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
+      - name: Create Release on tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
         with:
-          name: build-output
-          path: |
-            build/libs/
-            build/reports/
-          retention-days: 7
+          files: build/libs/*.jar
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release on manual dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/libs/*.jar
+          tag_name: build-${{ github.run_number }}
+          name: 'Build #${{ github.run_number }}'
+          generate_release_notes: true
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
