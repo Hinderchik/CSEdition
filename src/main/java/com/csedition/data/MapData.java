@@ -6,27 +6,33 @@ import java.util.List;
 
 /**
  * Данные одной карты. Загружаются из maps.json.
- * Содержит спавны для T и CT, а также зону закупа (прямоугольник).
+ * Содержит спавны для T и CT, а также раздельные зоны закупа для каждой команды.
  */
 public class MapData {
     private final String id;
     private final String displayName;
     private final List<BlockPos> tSpawns;
     private final List<BlockPos> ctSpawns;
-    private final BlockPos buyZoneMin;
-    private final BlockPos buyZoneMax;
+    // Раздельные зоны закупа для каждой команды
+    private final BlockPos tBuyZoneMin;
+    private final BlockPos tBuyZoneMax;
+    private final BlockPos ctBuyZoneMin;
+    private final BlockPos ctBuyZoneMax;
     private final BlockPos lobbySpawn;
 
     public MapData(String id, String displayName,
                    List<BlockPos> tSpawns, List<BlockPos> ctSpawns,
-                   BlockPos buyZoneMin, BlockPos buyZoneMax,
+                   BlockPos tBuyZoneMin, BlockPos tBuyZoneMax,
+                   BlockPos ctBuyZoneMin, BlockPos ctBuyZoneMax,
                    BlockPos lobbySpawn) {
         this.id = id;
         this.displayName = displayName;
         this.tSpawns = tSpawns;
         this.ctSpawns = ctSpawns;
-        this.buyZoneMin = buyZoneMin;
-        this.buyZoneMax = buyZoneMax;
+        this.tBuyZoneMin = tBuyZoneMin;
+        this.tBuyZoneMax = tBuyZoneMax;
+        this.ctBuyZoneMin = ctBuyZoneMin;
+        this.ctBuyZoneMax = ctBuyZoneMax;
         this.lobbySpawn = lobbySpawn;
     }
 
@@ -37,15 +43,23 @@ public class MapData {
     public BlockPos getLobbySpawn() { return lobbySpawn; }
 
     /**
-     * Проверяет, находится ли позиция внутри зоны закупа (AABB).
+     * Проверяет, находится ли позиция внутри зоны закупа для указанной команды.
      */
-    public boolean isInBuyZone(BlockPos pos) {
-        return pos.getX() >= Math.min(buyZoneMin.getX(), buyZoneMax.getX())
-            && pos.getX() <= Math.max(buyZoneMin.getX(), buyZoneMax.getX())
-            && pos.getY() >= Math.min(buyZoneMin.getY(), buyZoneMax.getY())
-            && pos.getY() <= Math.max(buyZoneMin.getY(), buyZoneMax.getY())
-            && pos.getZ() >= Math.min(buyZoneMin.getZ(), buyZoneMax.getZ())
-            && pos.getZ() <= Math.max(buyZoneMin.getZ(), buyZoneMax.getZ());
+    public boolean isInBuyZone(BlockPos pos, Team team) {
+        BlockPos min, max;
+        if (team == Team.T) {
+            min = tBuyZoneMin;
+            max = tBuyZoneMax;
+        } else {
+            min = ctBuyZoneMin;
+            max = ctBuyZoneMax;
+        }
+        return pos.getX() >= Math.min(min.getX(), max.getX())
+            && pos.getX() <= Math.max(min.getX(), max.getX())
+            && pos.getY() >= Math.min(min.getY(), max.getY())
+            && pos.getY() <= Math.max(min.getY(), max.getY())
+            && pos.getZ() >= Math.min(min.getZ(), max.getZ())
+            && pos.getZ() <= Math.max(min.getZ(), max.getZ());
     }
 
     public BlockPos getRandomSpawn(Team team, java.util.Random random) {

@@ -14,7 +14,6 @@ import com.csedition.tacz.TaczHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -44,6 +43,7 @@ public class MatchManager {
     public static final int BUY_TIME_TICKS = 15 * 20;   // 15 секунд
     public static final int FIGHTING_TICKS = 120 * 20;  // 2 минуты
     public static final int ROUND_END_TICKS = 5 * 20;   // 5 секунд
+    public static final int MIN_PLAYERS = 2;            // Минимум 2 игрока для старта
 
     private GamePhase phase = GamePhase.LOBBY;
     private String currentMapId = null;
@@ -80,7 +80,6 @@ public class MatchManager {
 
     public void onPlayerLeave(ServerPlayer player) {
         // Данные сохраняем, чтобы при возврате не терять статистику
-        // playerDataMap.remove(player.getUUID()); // раскомментировать если нужно
     }
 
     // ====================== Фазы ======================
@@ -158,6 +157,24 @@ public class MatchManager {
     // ====================== Раунды ======================
 
     public void startNewRound() {
+        // Проверка минимального количества игроков
+        int onlineCount = 0;
+        for (UUID uuid : playerDataMap.keySet()) {
+            if (getServerPlayer(uuid) != null) onlineCount++;
+        }
+        if (onlineCount < MIN_PLAYERS) {
+            // Недостаточно игроков — возврат в лобби
+            for (UUID uuid : playerDataMap.keySet()) {
+                ServerPlayer sp = getServerPlayer(uuid);
+                if (sp != null) {
+                    sp.sendSystemMessage(Component.literal("Not enough players (need " + MIN_PLAYERS + "). Returning to lobby."));
+                    teleportToLobby(sp);
+                }
+            }
+            setPhase(GamePhase.LOBBY);
+            return;
+        }
+
         roundNumber++;
         MapData map = getCurrentMap();
         if (map == null) {
@@ -202,15 +219,6 @@ public class MatchManager {
         setPhase(GamePhase.ROUND_END);
     }
 
-    private void startNewRoundAfterEnd() {
-        // После ROUND_END телепортируем всех в лобби, потом новый раунд
-        for (UUID uuid : playerDataMap.keySet()) {
-            ServerPlayer sp = getServerPlayer(uuid);
-            if (sp != null) teleportToLobby(sp);
-        }
-        startNewRound();
-    }
-
     // ====================== Покупка ======================
 
     public void handleBuyRequest(ServerPlayer player, String gunId) {
@@ -220,11 +228,11 @@ public class MatchManager {
             return;
         }
         MapData map = getCurrentMap();
-        if (map == null || !map.isInBuyZone(player.blockPosition())) {
+        PlayerData pd = getOrCreate(player);
+        if (map == null || !map.isInBuyZone(player.blockPosition(), pd.getTeam())) {
             player.sendSystemMessage(Component.literal("You must be in the buy zone!"));
             return;
         }
-        PlayerData pd = getOrCreate(player);
         int price = GunPriceTable.getPrice(gunId);
         if (price < 0) {
             player.sendSystemMessage(Component.literal("Unknown weapon."));
@@ -244,6 +252,48 @@ public class MatchManager {
         // Заменяем текущий основной слот (или даём в инвентарь)
         player.getInventory().add(gun);
         sendMoneyUpdate(player, pd);
+    }
+
+    /**
+     * Быстрая закупка (Z/X/C/4).
+     * Выбирает оружие по типу и покупает, если хватает денег.
+     */
+    public static void handleQuickBuy(ServerPlayer player, com.csedition.network.PacketQuickBuy.Type type) {
+        if (player == null) return;
+        MatchManager mm = getInstance();
+        if (mm.phase != GamePhase.BUY_TIME) {
+            player.sendSystemMessage(Component.literal("Buy time is over!"));
+            return;
+        }
+        MapData map = mm.getCurrentMap();
+        PlayerData pd = mm.getOrCreate(player);
+        if (map == null || !map.isInBuyZone(player.blockPosition(), pd.getTeam())) {
+            player.sendSystemMessage(Component.literal("You must be in the buy zone!"));
+            return;
+        }
+
+        String gunId = null;
+        switch (type) {
+            case LAST -> {
+                // Последнее купленное — берём из PlayerData
+                gunId = pd.getLastBought();
+                if (gunId == null) {
+                    player.sendSystemMessage(Component.literal("No previous purchase."));
+                    return;
+                }
+            }
+            case PRIMARY -> gunId = GunPriceTable.getCheapestOfCategory("rifle");
+            case SECONDARY -> gunId = GunPriceTable.getCheapestOfCategory("pistol");
+            case UTILITY -> gunId = GunPriceTable.getCheapestOfCategory("utility");
+        }
+
+        if (gunId == null) {
+            player.sendSystemMessage(Component.literal("No weapon available."));
+            return;
+        }
+
+        mm.handleBuyRequest(player, gunId);
+        pd.setLastBought(gunId);
     }
 
     // ====================== Карты ======================
@@ -305,8 +355,6 @@ public class MatchManager {
     }
 
     private ServerPlayer getServerPlayer(UUID uuid) {
-        // Получаем ServerPlayer по UUID через общий список игроков сервера
-        // (вызывающий код должен передать сервер; здесь используем утилиту)
         return ServerPlayerLookup.get(uuid);
     }
 }

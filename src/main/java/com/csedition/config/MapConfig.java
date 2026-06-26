@@ -32,8 +32,10 @@ import java.util.Map;
  *       "displayName": "Dust 2",
  *       "tSpawns": [[x,y,z], ...],
  *       "ctSpawns": [[x,y,z], ...],
- *       "buyZoneMin": [x, y, z],
- *       "buyZoneMax": [x, y, z]
+ *       "tBuyZoneMin": [x, y, z],
+ *       "tBuyZoneMax": [x, y, z],
+ *       "ctBuyZoneMin": [x, y, z],
+ *       "ctBuyZoneMax": [x, y, z]
  *     }
  *   ]
  * }
@@ -68,9 +70,13 @@ public class MapConfig {
                         String name = obj.has("displayName") ? obj.get("displayName").getAsString() : id;
                         List<BlockPos> tSpawns = parsePosList(obj.getAsJsonArray("tSpawns"));
                         List<BlockPos> ctSpawns = parsePosList(obj.getAsJsonArray("ctSpawns"));
-                        BlockPos min = parsePos(obj.getAsJsonArray("buyZoneMin"));
-                        BlockPos max = parsePos(obj.getAsJsonArray("buyZoneMax"));
-                        MAPS.put(id, new MapData(id, name, tSpawns, ctSpawns, min, max, lobbySpawn));
+                        // Раздельные зоны закупа для T и CT
+                        BlockPos tMin = parsePos(obj.getAsJsonArray("tBuyZoneMin"));
+                        BlockPos tMax = parsePos(obj.getAsJsonArray("tBuyZoneMax"));
+                        BlockPos ctMin = parsePos(obj.getAsJsonArray("ctBuyZoneMin"));
+                        BlockPos ctMax = parsePos(obj.getAsJsonArray("ctBuyZoneMax"));
+                        MAPS.put(id, new MapData(id, name, tSpawns, ctSpawns,
+                                tMin, tMax, ctMin, ctMax, lobbySpawn));
                     }
                 }
                 CSEditionMod.LOGGER.info("[CS-Edition] Loaded {} maps from maps.json", MAPS.size());
@@ -90,8 +96,10 @@ public class MapConfig {
                     "      \"displayName\": \"Dust 2\",\n" +
                     "      \"tSpawns\": [[10, 100, 10]],\n" +
                     "      \"ctSpawns\": [[-10, 100, -10]],\n" +
-                    "      \"buyZoneMin\": [0, 95, 0],\n" +
-                    "      \"buyZoneMax\": [20, 110, 20]\n" +
+                    "      \"tBuyZoneMin\": [5, 95, 5],\n" +
+                    "      \"tBuyZoneMax\": [15, 110, 15],\n" +
+                    "      \"ctBuyZoneMin\": [-15, 95, -15],\n" +
+                    "      \"ctBuyZoneMax\": [-5, 110, -5]\n" +
                     "    }\n" +
                     "  ]\n" +
                     "}\n");

@@ -17,6 +17,7 @@ public class PlayerData {
     private int kills = 0;
     private int deaths = 0;
     private boolean alive = true;
+    private String lastBought = null;  // Последнее купленное оружие (для Z)
 
     public PlayerData(UUID playerId) {
         this.playerId = playerId;
@@ -36,6 +37,8 @@ public class PlayerData {
     public int getDeaths() { return deaths; }
     public boolean isAlive() { return alive; }
     public void setAlive(boolean alive) { this.alive = alive; }
+    public String getLastBought() { return lastBought; }
+    public void setLastBought(String lastBought) { this.lastBought = lastBought; }
 
     public void resetForRound() {
         this.money = START_MONEY;
