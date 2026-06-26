@@ -51,6 +51,11 @@ public class MatchManager {
     private int roundNumber = 0;
     private final Map<UUID, PlayerData> playerDataMap = new HashMap<>();
     private final Random random = new Random();
+    // Кэш последнего пакета фазы — не создаём новый если данные не изменились
+    private PacketPhaseUpdate cachedPhasePacket = null;
+    private GamePhase lastBroadcastPhase = null;
+    private int lastBroadcastTicks = -1;
+    private String lastBroadcastMap = null;
 
     private MatchManager() {}
 
@@ -114,11 +119,20 @@ public class MatchManager {
     }
 
     public void broadcastPhase() {
-        PacketPhaseUpdate pkt = new PacketPhaseUpdate(phase, phaseTicks, currentMapId);
+        // Кэшируем пакет — не создаём новый если данные не изменились
+        if (cachedPhasePacket == null
+                || phase != lastBroadcastPhase
+                || phaseTicks != lastBroadcastTicks
+                || currentMapId != lastBroadcastMap) {
+            cachedPhasePacket = new PacketPhaseUpdate(phase, phaseTicks, currentMapId);
+            lastBroadcastPhase = phase;
+            lastBroadcastTicks = phaseTicks;
+            lastBroadcastMap = currentMapId;
+        }
         for (UUID uuid : playerDataMap.keySet()) {
             ServerPlayer sp = getServerPlayer(uuid);
             if (sp != null) {
-                CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), pkt);
+                CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), cachedPhasePacket);
             }
         }
     }

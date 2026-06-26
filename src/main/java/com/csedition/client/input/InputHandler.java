@@ -32,6 +32,10 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 @OnlyIn(Dist.CLIENT)
 public class InputHandler {
 
+    // Кэшированные ссылки — избегаем повторных статических обращений
+    private static final net.minecraft.world.effect.MobEffect NIGHT_VISION =
+        net.minecraft.world.effect.MobEffects.NIGHT_VISION;
+
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
@@ -111,13 +115,11 @@ public class InputHandler {
      * Переключить ночное зрение (эффект зелья).
      */
     private void toggleNightVision(Player player) {
-        boolean hasEffect = player.hasEffect(net.minecraft.world.effect.MobEffects.NIGHT_VISION);
-        if (hasEffect) {
-            player.removeEffect(net.minecraft.world.effect.MobEffects.NIGHT_VISION);
+        if (player.hasEffect(NIGHT_VISION)) {
+            player.removeEffect(NIGHT_VISION);
         } else {
             player.addEffect(new net.minecraft.world.effect.MobEffectInstance(
-                    net.minecraft.world.effect.MobEffects.NIGHT_VISION,
-                    6000, 0, false, false
+                    NIGHT_VISION, 6000, 0, false, false
             ));
         }
     }
