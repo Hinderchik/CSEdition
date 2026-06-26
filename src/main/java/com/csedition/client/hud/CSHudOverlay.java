@@ -9,7 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
-import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
+import net.minecraftforge.client.gui.overlay.NamedGuiOverlay;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 /**
@@ -22,11 +22,12 @@ public class CSHudOverlay {
 
     @SubscribeEvent
     public void onRenderOverlay(RenderGuiOverlayEvent.Pre event) {
-        VanillaGuiOverlay overlay = event.getOverlay();
-        if (overlay == VanillaGuiOverlay.PLAYER_HEALTH.type()
-                || overlay == VanillaGuiOverlay.FOOD_LEVEL.type()
-                || overlay == VanillaGuiOverlay.AIR_LEVEL.type()
-                || overlay == VanillaGuiOverlay.ARMOR_LEVEL.type()) {
+        NamedGuiOverlay overlay = event.getOverlay();
+        String id = overlay.id().toString();
+        if (id.equals("minecraft:player_health")
+                || id.equals("minecraft:food_level")
+                || id.equals("minecraft:air_level")
+                || id.equals("minecraft:armor_level")) {
             event.setCanceled(true);
         }
     }

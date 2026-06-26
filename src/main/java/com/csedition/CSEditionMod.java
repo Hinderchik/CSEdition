@@ -32,7 +32,7 @@ public class CSEditionMod {
         MinecraftForge.EVENT_BUS.register(new com.csedition.event.ServerEvents());
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON,
-                net.minecraftforge.common.ForgeConfigSpec.Builder.builder().build(),
+                new net.minecraftforge.common.ForgeConfigSpec.Builder().build(),
                 "csedition-common.toml");
 
         MapConfig.load();
