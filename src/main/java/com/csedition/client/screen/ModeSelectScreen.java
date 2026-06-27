@@ -25,7 +25,7 @@ public class ModeSelectScreen extends Screen {
     private int scrollOffset = 0;
 
     public ModeSelectScreen(Screen parent) {
-        super(Component.literal("Select Mode"));
+        super(Component.literal("Выбор режима"));
         this.parent = parent;
         refreshModes();
     }
@@ -56,7 +56,7 @@ public class ModeSelectScreen extends Screen {
 
         // Кнопка "Назад"
         this.addRenderableWidget(Button.builder(
-                Component.literal("Back"),
+                Component.literal("Назад"),
                 b -> Minecraft.getInstance().setScreen(parent)
         ).bounds(cx - 50, this.height - 30, 100, 20).build());
 
@@ -87,14 +87,14 @@ public class ModeSelectScreen extends Screen {
         Font font = this.font;
 
         // Заголовок
-        String title = "Select Game Mode";
+        String title = "ВЫБОР РЕЖИМА";
         g.drawString(font, title, this.width / 2 - font.width(title) / 2, 15, CSRenderUtil.CS_YELLOW);
 
         // Описание под заголовком
-        g.drawString(font, "Choose a mode, then a map", this.width / 2 - 60, 28, 0xFFAAAAAA);
+        g.drawString(font, "Выберите режим, затем карту", this.width / 2 - 60, 28, 0xFFAAAAAA);
 
         // Подсказка о выбранном режиме
-        String current = "Current: " + ClientState.getSelectedModeId();
+        String current = "Текущий: " + ClientState.getSelectedModeId();
         g.drawString(font, current, 10, this.height - 15, 0xFF888888);
 
         super.render(g, mouseX, mouseY, partialTick);

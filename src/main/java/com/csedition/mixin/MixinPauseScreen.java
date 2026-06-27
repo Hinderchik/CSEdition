@@ -31,15 +31,15 @@ public abstract class MixinPauseScreen extends Screen {
         int cx = this.width / 2;
         int y = this.height / 2;
         this.addRenderableWidget(Button.builder(
-                Component.literal("Back to Game"),
+                Component.literal("Вернуться в игру"),
                 b -> mc.setScreen(null))
                 .bounds(cx - 120, y - 40, 240, 28).build());
         this.addRenderableWidget(Button.builder(
-                Component.literal("Options"),
+                Component.literal("Настройки"),
                 b -> mc.setScreen(new OptionsScreen((PauseScreen)(Object)this, mc.options)))
                 .bounds(cx - 120, y - 8, 240, 28).build());
         this.addRenderableWidget(Button.builder(
-                Component.literal("Disconnect"),
+                Component.literal("Отключиться"),
                 b -> mc.level.disconnect())
                 .bounds(cx - 120, y + 24, 240, 28).build());
     }

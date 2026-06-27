@@ -116,23 +116,23 @@ public class CSHudOverlay {
         String title;
         int titleColor;
         if ("TARGET_KILLS".equals(reason)) {
-            title = "MATCH OVER";
+            title = "МАТЧ ОКОНЧЕН";
             titleColor = 0xFFFFAA00;
         } else {
-            title = "ROUND " + round + " OVER";
+            title = "РАУНД " + round + " ОКОНЧЕН";
             titleColor = 0xFFFFFFFF;
         }
         int titleX = w / 2 - font.width(title) / 2;
         g.drawString(font, title, titleX, h / 2 - 40, titleColor);
 
-        String winnerText = "Winner: " + winner;
+        String winnerText = "Победитель: " + winner;
         int winnerX = w / 2 - font.width(winnerText) / 2;
         g.drawString(font, winnerText, winnerX, h / 2 - 20, 0xFF55FF55);
 
         String reasonText = switch (reason) {
-            case "ELIMINATION" -> "All enemies eliminated";
-            case "TIME_OUT" -> "Time ran out";
-            case "TARGET_KILLS" -> "Target kills reached (" + topKills + ")";
+            case "ELIMINATION" -> "Все противники уничтожены";
+            case "TIME_OUT" -> "Время вышло";
+            case "TARGET_KILLS" -> "Достигнуто целевое число убийств (" + topKills + ")";
             default -> reason;
         };
         int reasonX = w / 2 - font.width(reasonText) / 2;
@@ -205,7 +205,13 @@ public class CSHudOverlay {
         cachedPhaseTicks = ticks;
 
         Font font = Minecraft.getInstance().font;
-        String text = ClientState.getPhase().name() + "  " + (ticks / 20) + "s";
+        String phaseName = switch (ClientState.getPhase()) {
+            case LOBBY -> "ЛОББИ";
+            case BUY_TIME -> "ЗАКУП";
+            case FIGHTING -> "БОЙ";
+            case ROUND_END -> "КОНЕЦ РАУНДА";
+        };
+        String text = phaseName + "  " + (ticks / 20) + "с";
         int x = w / 2 - font.width(text) / 2;
         g.drawString(font, text, x, 8, CSRenderUtil.CS_YELLOW);
     }

@@ -34,7 +34,7 @@ public class MapSelectScreen extends Screen {
     private List<PacketMapList.MapEntry> maps;
 
     public MapSelectScreen() {
-        super(Component.literal("Select Map"));
+        super(Component.literal("Выбор карты"));
     }
 
     @Override
@@ -73,7 +73,7 @@ public class MapSelectScreen extends Screen {
         // Кнопка закрытия
         int closeY = height - FOOTER_HEIGHT;
         addRenderableWidget(Button.builder(
-                Component.literal("Close"),
+                Component.literal("Закрыть"),
                 b -> Minecraft.getInstance().setScreen(null)
         ).bounds(width / 2 - 50, closeY, 100, 20).build());
     }
@@ -90,13 +90,13 @@ public class MapSelectScreen extends Screen {
         g.fill(0, 0, width, height, 0xE0101010);
 
         // Заголовок
-        String title = "SELECT MAP";
+        String title = "ВЫБОР КАРТЫ";
         int titleW = font.width(title);
         g.drawString(font, title, (width - titleW) / 2, 12, 0xFFFFAA00);
 
         // Подсказка о прокрутке
         if (maxScroll > 0) {
-            String hint = "Scroll to see more";
+            String hint = "Прокрутите для просмотра";
             int hintW = font.width(hint);
             g.drawString(font, hint, (width - hintW) / 2, height - FOOTER_HEIGHT - 14, 0xFF888888);
         }

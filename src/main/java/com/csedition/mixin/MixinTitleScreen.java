@@ -32,15 +32,15 @@ public abstract class MixinTitleScreen extends Screen {
         int cx = this.width / 2;
         int y = this.height / 2;
         this.addRenderableWidget(Button.builder(
-                Component.literal("Singleplayer"),
+                Component.literal("Одиночная игра"),
                 b -> mc.setScreen(new SelectWorldScreen((TitleScreen)(Object)this)))
                 .bounds(cx - 120, y - 40, 240, 28).build());
         this.addRenderableWidget(Button.builder(
-                Component.literal("Options"),
+                Component.literal("Настройки"),
                 b -> mc.setScreen(new OptionsScreen((TitleScreen)(Object)this, mc.options)))
                 .bounds(cx - 120, y - 8, 240, 28).build());
         this.addRenderableWidget(Button.builder(
-                Component.literal("Quit Game"),
+                Component.literal("Выйти из игры"),
                 b -> mc.stop())
                 .bounds(cx - 120, y + 24, 240, 28).build());
     }

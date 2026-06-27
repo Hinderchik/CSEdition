@@ -29,10 +29,10 @@ public class BuyMenuScreen extends Screen {
 
     // Категории для отображения
     private static final String[] CATEGORIES = {"pistol", "smg", "rifle", "sniper", "heavy", "utility"};
-    private static final String[] CATEGORY_NAMES = {"PISTOLS", "SMGs", "RIFLES", "SNIPERS", "HEAVY", "UTILITY"};
+    private static final String[] CATEGORY_NAMES = {"ПИСТОЛЕТЫ", "ПП", "АВТОМАТЫ", "СНАЙПЕРКИ", "ТЯЖЁЛОЕ", "СНАРЯЖЕНИЕ"};
 
     public BuyMenuScreen() {
-        super(Component.literal("Buy Menu"));
+        super(Component.literal("Меню закупа"));
     }
 
     @Override
@@ -42,7 +42,7 @@ public class BuyMenuScreen extends Screen {
         CSRenderUtil.scanlines(g, 0, 0, this.width, this.height, 3);
 
         // Заголовок в панели
-        String title = "BUY MENU  $" + ClientState.getMoney();
+        String title = "МЕНЮ ЗАКУПА  $" + ClientState.getMoney();
         int titleW = this.font.width(title) + 24;
         CSRenderUtil.csPanel(g, this.width / 2 - titleW / 2, 8, titleW, 26, null, this.font);
         CSRenderUtil.cornerAccents(g, this.width / 2 - titleW / 2, 8, titleW, 26, 6, CSRenderUtil.CS_ORANGE);
@@ -96,7 +96,7 @@ public class BuyMenuScreen extends Screen {
         }
 
         // Подсказка
-        g.drawCenteredString(this.font, "Press ESC to close  |  Z=last  X=rifle  C=pistol  4=utility",
+        g.drawCenteredString(this.font, "ESC — закрыть  |  Z=последнее  X=автомат  C=пистолет  4=снаряжение",
                 this.width / 2, this.height - 16, 0xFF888888);
     }
 
