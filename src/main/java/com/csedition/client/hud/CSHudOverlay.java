@@ -2,7 +2,6 @@ package com.csedition.client.hud;
 
 import com.csedition.client.ClientState;
 import com.csedition.client.render.CSRenderUtil;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -21,6 +20,10 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
  *   - Пропуск отрисовки при отсутствии изменений
  *   - Минимум аллокаций в горячем пути
  *   - Прямые вызовы fill() вместо сложных утилит
+ *
+ * В Forge 1.20.1 RenderGuiOverlayEvent.Post срабатывает для КАЖДОГО оверлея.
+ * Чтобы не рисовать HUD многократно за кадр, используем флаг lastFrame —
+ * рисуем только при первом Post-событии в текущем кадре.
  */
 @OnlyIn(Dist.CLIENT)
 public class CSHudOverlay {
@@ -34,6 +37,9 @@ public class CSHudOverlay {
     private int cachedAmmoIn = -1;
     private int cachedAmmoRes = -1;
     private int cachedW = -1, cachedH = -1;
+
+    // Номер последнего кадра, в котором мы рисовали HUD
+    private long lastRenderFrame = -1;
 
     @SubscribeEvent
     public void onRenderOverlay(RenderGuiOverlayEvent.Pre event) {
@@ -58,7 +64,15 @@ public class CSHudOverlay {
 
     @SubscribeEvent
     public void onRenderPost(RenderGuiOverlayEvent.Post event) {
+        // Рисуем HUD только один раз за кадр.
+        // Post срабатывает для каждого оверлея — используем frame counter.
         Minecraft mc = Minecraft.getInstance();
+        long currentFrame = mc.getFrameTime() > 0 ? mc.level.getGameTime() : 0;
+        // Простой способ: используем System.nanoTime() / 16ms как номер кадра
+        long frameId = System.nanoTime() / 16_666_666L;
+        if (frameId == lastRenderFrame) return;
+        lastRenderFrame = frameId;
+
         if (mc.player == null || mc.level == null) return;
         if (mc.options.hideGui) return;
 

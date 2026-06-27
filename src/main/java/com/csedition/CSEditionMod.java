@@ -30,6 +30,7 @@ public class CSEditionMod {
         MinecraftForge.EVENT_BUS.register(MatchManager.getInstance());
         MinecraftForge.EVENT_BUS.register(new com.csedition.event.PlayerEvents());
         MinecraftForge.EVENT_BUS.register(new com.csedition.event.ServerEvents());
+        MinecraftForge.EVENT_BUS.register(new com.csedition.command.CSCommand());
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON,
                 new net.minecraftforge.common.ForgeConfigSpec.Builder().build(),
