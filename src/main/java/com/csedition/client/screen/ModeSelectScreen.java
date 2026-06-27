@@ -77,7 +77,7 @@ public class ModeSelectScreen extends Screen {
 
     private void selectMode(GameMode mode) {
         ClientState.setSelectedModeId(mode.getId());
-        Minecraft.getInstance().setScreen(new MapSelectScreen(this, mode.getId()));
+        Minecraft.getInstance().setScreen(new MapSelectScreen(mode.getId(), this));
     }
 
     @Override
