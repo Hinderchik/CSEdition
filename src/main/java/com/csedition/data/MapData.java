@@ -70,11 +70,18 @@ public class MapData {
     public BlockPos getCtBuyZoneMax() { return ctBuyZoneMax; }
 
     /**
+     * Специальное значение modeId — карта доступна во всех режимах.
+     */
+    public static final String MODE_ANY = "any";
+
+    /**
      * Проверяет, подходит ли карта для указанного режима.
-     * Пустой modeId = карта доступна во всех режимах.
+     * Пустой modeId или "any" = карта доступна во всех режимах.
      */
     public boolean isForMode(String modeId) {
-        return this.modeId == null || this.modeId.isEmpty() || this.modeId.equals(modeId);
+        if (this.modeId == null || this.modeId.isEmpty()) return true;
+        if (MODE_ANY.equalsIgnoreCase(this.modeId)) return true;
+        return this.modeId.equals(modeId);
     }
 
     /**

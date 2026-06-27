@@ -15,20 +15,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Экран выбора режима. Открывается по клавише M в лобби.
+ * Экран выбора режима в стиле CS.
  * После выбора режима открывает MapSelectScreen с фильтром по режиму.
  *
- * Стиль CS: тёмный фон, оранжевый заголовок, аккуратные кнопки без наложений.
+ * Стиль: тёмный фон с сканлайнами, оранжевые акценты, угловые рамки.
  */
 public class ModeSelectScreen extends Screen {
     private final Screen parent;
     private final List<GameMode> modes = new ArrayList<>();
     private int scrollOffset = 0;
 
-    private static final int ROW_H = 32;
-    private static final int TOP_Y = 50;
-    private static final int BOTTOM_PAD = 50;
-    private static final int BTN_W = 280;
+    private static final int ROW_H = 36;
+    private static final int TOP_Y = 70;
+    private static final int BOTTOM_PAD = 60;
+    private static final int BTN_W = 320;
 
     public ModeSelectScreen(Screen parent) {
         super(Component.literal("Выбор режима"));
@@ -62,30 +62,30 @@ public class ModeSelectScreen extends Screen {
             Button btn = Button.builder(
                     Component.literal(mode.getDisplayName() + (mode.isBuiltIn() ? "" : " *")),
                     b -> selectMode(mode)
-            ).bounds(cx - BTN_W / 2, y, BTN_W, ROW_H - 4).build();
+            ).bounds(cx - BTN_W / 2, y, BTN_W, ROW_H - 6).build();
             this.addRenderableWidget(btn);
         }
 
         // Кнопки прокрутки (справа от списка)
-        int scrollX = cx + BTN_W / 2 + 8;
+        int scrollX = cx + BTN_W / 2 + 10;
         if (scrollOffset > 0) {
             this.addRenderableWidget(Button.builder(
                     Component.literal("\u25B2"),
                     b -> { scrollOffset = Math.max(0, scrollOffset - 1); rebuildWidgets(); }
-            ).bounds(scrollX, TOP_Y, 24, 24).build());
+            ).bounds(scrollX, TOP_Y, 28, 28).build());
         }
         if (scrollOffset + visibleRows < modes.size()) {
             this.addRenderableWidget(Button.builder(
                     Component.literal("\u25BC"),
                     b -> { scrollOffset++; rebuildWidgets(); }
-            ).bounds(scrollX, TOP_Y + 28, 24, 24).build());
+            ).bounds(scrollX, TOP_Y + 32, 28, 28).build());
         }
 
         // Кнопка "Назад"
         this.addRenderableWidget(Button.builder(
                 Component.literal("Назад"),
                 b -> Minecraft.getInstance().setScreen(parent)
-        ).bounds(cx - 50, this.height - 30, 100, 20).build());
+        ).bounds(cx - 50, this.height - 32, 100, 22).build());
     }
 
     private void selectMode(GameMode mode) {
@@ -96,24 +96,41 @@ public class ModeSelectScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         // Тёмный фон
-        g.fill(0, 0, this.width, this.height, 0xE0101010);
+        g.fill(0, 0, this.width, this.height, 0xFF050505);
+
+        // Сканлайны
+        CSRenderUtil.scanlines(g, 0, 0, this.width, this.height, 3);
+
+        // Верхняя панель
+        g.fill(0, 0, this.width, 55, 0xCC0A0A0A);
+        g.fill(0, 53, this.width, 55, CSRenderUtil.CS_ORANGE);
 
         Font font = this.font;
 
         // Заголовок
         String title = "ВЫБОР РЕЖИМА";
         int titleW = font.width(title);
-        g.drawString(font, title, this.width / 2 - titleW / 2, 15, CSRenderUtil.CS_YELLOW);
+        g.drawString(font, title, this.width / 2 - titleW / 2, 12, CSRenderUtil.CS_ORANGE);
 
-        // Подсказка
-        g.drawString(font, "Выберите режим, затем карту", this.width / 2 - 60, 32, 0xFFAAAAAA);
+        // Подзаголовок
+        String subtitle = "Выберите режим, затем карту";
+        int subW = font.width(subtitle);
+        g.drawString(font, subtitle, this.width / 2 - subW / 2, 30, 0xFFAAAAAA);
+
+        // Угловые акценты
+        CSRenderUtil.cornerAccents(g, 0, 0, this.width, 55, 12, CSRenderUtil.CS_ORANGE);
 
         // Индикатор прокрутки
         if (!modes.isEmpty()) {
             int visibleRows = Math.max(1, (this.height - TOP_Y - BOTTOM_PAD) / ROW_H);
-            String scrollInfo = (scrollOffset + 1) + "-" + Math.min(scrollOffset + visibleRows, modes.size()) + " / " + modes.size();
+            String scrollInfo = "Режимы " + (scrollOffset + 1) + "-" +
+                    Math.min(scrollOffset + visibleRows, modes.size()) + " из " + modes.size();
             int infoW = font.width(scrollInfo);
-            g.drawString(font, scrollInfo, this.width / 2 - infoW / 2, this.height - 45, 0xFF888888);
+            g.drawString(font, scrollInfo, this.width / 2 - infoW / 2, this.height - 50, 0xFF888888);
+        } else {
+            String empty = "Нет доступных режимов";
+            int w = font.width(empty);
+            g.drawString(font, empty, this.width / 2 - w / 2, this.height / 2, 0xFFFF6666);
         }
 
         // Текущий режим
