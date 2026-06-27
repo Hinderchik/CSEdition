@@ -7,8 +7,7 @@
     "MixinGui",
     "MixinTitleScreen",
     "MixinPauseScreen",
-    "MixinInventoryScreen",
-    "MixinLoadingOverlay"
+    "MixinInventoryScreen"
   ],
   "injectors": {
     "defaultRequire": 1
