@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Использует текстуру assets/csedition/textures/gui/loading_background.png
  * (положите свой start.jpg/png туда).
  */
-@Mixin(LevelLoadingScreen.class)
+@Mixin(value = LevelLoadingScreen.class, remap = false)
 public class MixinLevelLoadingScreen {
 
     private static final ResourceLocation CUSTOM_BG =
@@ -33,7 +33,7 @@ public class MixinLevelLoadingScreen {
      * Полностью заменяет стандартный фон на нашу текстуру.
      * Вызывается в начале render() — оригинальный метод отменяется.
      */
-    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "render", at = @At("HEAD"), cancellable = true, remap = false)
     private void csEdition$drawCustomBackground(net.minecraft.client.gui.GuiGraphics g, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         int width = mc.getWindow().getGuiScaledWidth();
