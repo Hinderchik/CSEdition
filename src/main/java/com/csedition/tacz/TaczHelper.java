@@ -120,6 +120,6 @@ public final class TaczHelper {
     public static boolean giveGun(net.minecraft.server.level.ServerPlayer player, String gunId) {
         ItemStack stack = createGun(gunId);
         if (stack.isEmpty()) return false;
-        return player.getInventory().add(stack).isEmpty();
+        return player.getInventory().add(stack);
     }
 }

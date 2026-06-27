@@ -49,7 +49,7 @@ public class InputHandler {
         // B: в лобби — выбор карты (с фильтром по выбранному режиму), в BUY_TIME — меню закупа
         if (KeyBindings.OPEN_BUY_MENU.consumeClick()) {
             if (phase == GamePhase.LOBBY) {
-                mc.setScreen(new MapSelectScreen(null, ClientState.getSelectedModeId()));
+                mc.setScreen(new MapSelectScreen(ClientState.getSelectedModeId()));
             } else if (phase == GamePhase.BUY_TIME) {
                 mc.setScreen(new BuyMenuScreen());
             }

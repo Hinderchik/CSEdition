@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraftforge.network.PacketDistributor;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Экран выбора карты.
@@ -20,6 +21,8 @@ import java.util.List;
  *
  * Карты приходят с сервера через PacketMapList и хранятся в ClientState.mapList.
  * При клике отправляется PacketSelectMap на сервер.
+ *
+ * Может фильтровать по modeId (если задан) — показывает только карты выбранного режима.
  */
 public class MapSelectScreen extends Screen {
     private static final int COLS = 3;
@@ -32,19 +35,40 @@ public class MapSelectScreen extends Screen {
     private int scrollOffset = 0;
     private int maxScroll = 0;
     private List<PacketMapList.MapEntry> maps;
+    private final String modeId; // null = все карты
 
     public MapSelectScreen() {
+        this(null);
+    }
+
+    public MapSelectScreen(String modeId) {
+        this(modeId, null);
+    }
+
+    public MapSelectScreen(String modeId, Screen parent) {
         super(Component.literal("Выбор карты"));
+        this.modeId = modeId;
+        // parent не используется, но принимаем для совместимости
     }
 
     @Override
     protected void init() {
         super.init();
-        this.maps = ClientState.getMapList();
+        // Фильтруем карты по режиму, если modeId задан
+        List<PacketMapList.MapEntry> all = ClientState.getMapList();
+        if (all == null) {
+            this.maps = java.util.Collections.emptyList();
+        } else if (modeId == null || modeId.isEmpty()) {
+            this.maps = all;
+        } else {
+            this.maps = all.stream()
+                    .filter(e -> modeId.equals(e.modeId))
+                    .collect(Collectors.toList());
+        }
         rebuildWidgets();
     }
 
-    private void rebuildWidgets() {
+    protected void rebuildWidgets() {
         clearWidgets();
         if (maps == null) return;
 
@@ -64,8 +88,8 @@ public class MapSelectScreen extends Screen {
             int y = startY + row * (BTN_SIZE + GAP);
             PacketMapList.MapEntry entry = maps.get(i);
             Button btn = Button.builder(
-                    Component.literal(entry.displayName()),
-                    b -> selectMap(entry.id())
+                    Component.literal(entry.displayName),
+                    b -> selectMap(entry.id)
             ).bounds(x, y, BTN_SIZE, BTN_SIZE).build();
             addRenderableWidget(btn);
         }
@@ -90,7 +114,9 @@ public class MapSelectScreen extends Screen {
         g.fill(0, 0, width, height, 0xE0101010);
 
         // Заголовок
-        String title = "ВЫБОР КАРТЫ";
+        String title = modeId != null && !modeId.isEmpty()
+                ? "ВЫБОР КАРТЫ — " + modeId.toUpperCase()
+                : "ВЫБОР КАРТЫ";
         int titleW = font.width(title);
         g.drawString(font, title, (width - titleW) / 2, 12, 0xFFFFAA00);
 

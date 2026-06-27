@@ -8,6 +8,7 @@ version="${file.jarVersion}"
 displayName="CS Edition"
 description="CS-style shooter mod built on top of TaCZ for Minecraft 1.20.1"
 authors="Hinderchik"
+logoFile="icon.png"
 
 [[dependencies.csedition]]
     modId="forge"
