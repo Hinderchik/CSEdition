@@ -112,4 +112,14 @@ public final class TaczHelper {
         getCreateGunMethod();
         return API_AVAILABLE;
     }
+
+    /**
+     * Выдаёт пушку игроку (добавляет в инвентарь).
+     * @return true если успешно выдано
+     */
+    public static boolean giveGun(net.minecraft.server.level.ServerPlayer player, String gunId) {
+        ItemStack stack = createGun(gunId);
+        if (stack.isEmpty()) return false;
+        return player.getInventory().add(stack).isEmpty();
+    }
 }

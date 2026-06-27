@@ -23,9 +23,18 @@ public class ClientState {
     private static String currentMapId = "";
     private static String currentModeId = "classic";
     private static List<PacketMapList.MapEntry> mapList = new ArrayList<>();
-    private static String mapsJson = "";  // Полный maps.json с сервера
-    private static String modesJson = ""; // Полный modes.json с сервера
-    private static String selectedModeId = "classic"; // Выбранный режим на клиенте (для GUI)
+    private static String mapsJson = "";
+    private static String modesJson = "";
+    private static String selectedModeId = "classic";
+
+    // Данные для экрана окончания раунда
+    private static boolean showRoundEndScreen = false;
+    private static String roundEndWinner = "";
+    private static String roundEndReason = "";
+    private static int roundEndRound = 0;
+    private static int roundEndTopKills = -1;
+    private static long roundEndStartTime = 0;
+    private static final long ROUND_END_DISPLAY_MS = 5000; // 5 секунд
 
     public static void update(int m, int k, int d) {
         money = m; kills = k; deaths = d;
@@ -52,6 +61,35 @@ public class ClientState {
     public static void setSelectedModeId(String modeId) {
         selectedModeId = modeId == null || modeId.isEmpty() ? "classic" : modeId;
     }
+
+    /**
+     * Показывает экран окончания раунда/матча.
+     */
+    public static void showRoundEnd(String winner, String reason, int round, int topKills) {
+        showRoundEndScreen = true;
+        roundEndWinner = winner;
+        roundEndReason = reason;
+        roundEndRound = round;
+        roundEndTopKills = topKills;
+        roundEndStartTime = System.currentTimeMillis();
+    }
+
+    /**
+     * Проверяет, нужно ли ещё показывать экран окончания раунда.
+     */
+    public static boolean shouldShowRoundEnd() {
+        if (!showRoundEndScreen) return false;
+        if (System.currentTimeMillis() - roundEndStartTime > ROUND_END_DISPLAY_MS) {
+            showRoundEndScreen = false;
+            return false;
+        }
+        return true;
+    }
+
+    public static String getRoundEndWinner() { return roundEndWinner; }
+    public static String getRoundEndReason() { return roundEndReason; }
+    public static int getRoundEndRound() { return roundEndRound; }
+    public static int getRoundEndTopKills() { return roundEndTopKills; }
 
     public static int getMoney() { return money; }
     public static int getKills() { return kills; }

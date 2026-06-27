@@ -257,7 +257,7 @@ public final class ModeConfig {
         if (server == null) {
             return Path.of("config", "csedition-modes.json");
         }
-        return server.getWorldData().getDataDir()
+        return server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
                 .resolve("data").resolve("csedition").resolve("modes.json");
     }
 }

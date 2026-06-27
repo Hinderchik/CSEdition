@@ -2,6 +2,7 @@ package com.csedition.client.hud;
 
 import com.csedition.client.ClientState;
 import com.csedition.client.render.CSRenderUtil;
+import com.csedition.data.GamePhase;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -21,9 +22,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
  *   - Минимум аллокаций в горячем пути
  *   - Прямые вызовы fill() вместо сложных утилит
  *
- * В Forge 1.20.1 RenderGuiOverlayEvent.Post срабатывает для КАЖДОГО оверлея.
- * Чтобы не рисовать HUD многократно за кадр, используем флаг lastFrame —
- * рисуем только при первом Post-событии в текущем кадре.
+ * В лобби (LOBBY) показывается стандартный ванильный HUD (сердечки, голод, хотбар).
+ * В катке (BUY_TIME / FIGHTING / ROUND_END) — кастомный CS HUD.
  */
 @OnlyIn(Dist.CLIENT)
 public class CSHudOverlay {
@@ -43,9 +43,12 @@ public class CSHudOverlay {
 
     @SubscribeEvent
     public void onRenderOverlay(RenderGuiOverlayEvent.Pre event) {
+        // В лобби — НЕ отключаем ванильные оверлеи (показываем стандартный HUD)
+        if (ClientState.getPhase() == GamePhase.LOBBY) return;
+
         NamedGuiOverlay overlay = event.getOverlay();
         String id = overlay.id().toString();
-        // Отключаем стандартные оверлеи — рисуем свои
+        // В катке — отключаем стандартные оверлеи, рисуем свои
         switch (id) {
             case "minecraft:player_health":
             case "minecraft:food_level":
@@ -64,11 +67,11 @@ public class CSHudOverlay {
 
     @SubscribeEvent
     public void onRenderPost(RenderGuiOverlayEvent.Post event) {
+        // В лобби — не рисуем кастомный HUD (используется ванильный)
+        if (ClientState.getPhase() == GamePhase.LOBBY) return;
+
         // Рисуем HUD только один раз за кадр.
-        // Post срабатывает для каждого оверлея — используем frame counter.
         Minecraft mc = Minecraft.getInstance();
-        long currentFrame = mc.getFrameTime() > 0 ? mc.level.getGameTime() : 0;
-        // Простой способ: используем System.nanoTime() / 16ms как номер кадра
         long frameId = System.nanoTime() / 16_666_666L;
         if (frameId == lastRenderFrame) return;
         lastRenderFrame = frameId;
@@ -96,7 +99,44 @@ public class CSHudOverlay {
         drawMoney(g, w, h);
         drawAmmo(g, w, h, mc.player);
         drawPhaseTimer(g, w, h);
-        drawCrosshair(g, w, h);
+        drawRoundEndScreen(g, w, h);
+    }
+
+    private void drawRoundEndScreen(GuiGraphics g, int w, int h) {
+        if (!ClientState.shouldShowRoundEnd()) return;
+        // Затемнение фона
+        g.fill(0, 0, w, h, 0x80000000);
+        // Заголовок
+        Font font = Minecraft.getInstance().font;
+        String winner = ClientState.getRoundEndWinner();
+        String reason = ClientState.getRoundEndReason();
+        int round = ClientState.getRoundEndRound();
+        int topKills = ClientState.getRoundEndTopKills();
+
+        String title;
+        int titleColor;
+        if ("TARGET_KILLS".equals(reason)) {
+            title = "MATCH OVER";
+            titleColor = 0xFFFFAA00;
+        } else {
+            title = "ROUND " + round + " OVER";
+            titleColor = 0xFFFFFFFF;
+        }
+        int titleX = w / 2 - font.width(title) / 2;
+        g.drawString(font, title, titleX, h / 2 - 40, titleColor);
+
+        String winnerText = "Winner: " + winner;
+        int winnerX = w / 2 - font.width(winnerText) / 2;
+        g.drawString(font, winnerText, winnerX, h / 2 - 20, 0xFF55FF55);
+
+        String reasonText = switch (reason) {
+            case "ELIMINATION" -> "All enemies eliminated";
+            case "TIME_OUT" -> "Time ran out";
+            case "TARGET_KILLS" -> "Target kills reached (" + topKills + ")";
+            default -> reason;
+        };
+        int reasonX = w / 2 - font.width(reasonText) / 2;
+        g.drawString(font, reasonText, reasonX, h / 2, 0xFFCCCCCC);
     }
 
     private void drawHealthArmor(GuiGraphics g, int w, int h, Player p) {
@@ -168,23 +208,5 @@ public class CSHudOverlay {
         String text = ClientState.getPhase().name() + "  " + (ticks / 20) + "s";
         int x = w / 2 - font.width(text) / 2;
         g.drawString(font, text, x, 8, CSRenderUtil.CS_YELLOW);
-    }
-
-    /**
-     * Прицел — рисуется всегда (нужна плавность).
-     * Использует прямые вызовы fill() без лишних проверок.
-     */
-    private void drawCrosshair(GuiGraphics g, int w, int h) {
-        int cx = w / 2;
-        int cy = h / 2;
-        int size = 5;
-        int gap = 2;
-        int color = 0xFF55FF55;
-        // Горизонтальные линии
-        g.fill(cx - size - gap, cy, cx - gap, cy + 1, color);
-        g.fill(cx + gap + 1, cy, cx + size + gap, cy + 1, color);
-        // Вертикальные линии
-        g.fill(cx, cy - size - gap, cx + 1, cy - gap, color);
-        g.fill(cx, cy + gap + 1, cx + 1, cy + size + gap, color);
     }
 }

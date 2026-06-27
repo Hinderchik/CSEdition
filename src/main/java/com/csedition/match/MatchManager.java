@@ -1,6 +1,7 @@
 package com.csedition.match;
 
 import com.csedition.CSEditionMod;
+import com.csedition.config.CSConfig;
 import com.csedition.config.MapConfig;
 import com.csedition.config.ModeConfig;
 import com.csedition.data.GameMode;
@@ -12,6 +13,7 @@ import com.csedition.network.CSPackets;
 import com.csedition.network.PacketMapList;
 import com.csedition.network.PacketMoneyUpdate;
 import com.csedition.network.PacketPhaseUpdate;
+import com.csedition.network.PacketRoundEnd;
 import com.csedition.tacz.TaczHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -34,25 +36,27 @@ import java.util.*;
  *   - phaseTicks: оставшееся время фазы в тиках
  *   - playerDataMap: данные игроков (UUID -> PlayerData)
  *   - roundNumber: номер текущего раунда
+ *   - matchOver: true если матч окончен (кто-то набрал killsToWin)
  *
  * Синхронизация с клиентом:
  *   - При смене фазы рассылает PacketPhaseUpdate всем игрокам.
  *   - При изменении денег/убийств отправляет PacketMoneyUpdate конкретному игроку.
+ *   - При окончании раунда отправляет PacketRoundEnd (победитель + причина).
  *   - При входе игрока отправляет PacketMapList со списком карт и PacketSyncModes.
  */
 public class MatchManager {
     private static final MatchManager INSTANCE = new MatchManager();
 
-    public static final int MIN_PLAYERS = 2;            // Минимум 2 игрока для старта
+    public static final int MIN_PLAYERS = 2;
 
     private GamePhase phase = GamePhase.LOBBY;
     private String currentMapId = null;
     private String currentModeId = "classic";
     private int phaseTicks = 0;
     private int roundNumber = 0;
+    private boolean matchOver = false;
     private final Map<UUID, PlayerData> playerDataMap = new HashMap<>();
     private final Random random = new Random();
-    // Кэш последнего пакета фазы — не создаём новый если данные не изменились
     private PacketPhaseUpdate cachedPhasePacket = null;
     private GamePhase lastBroadcastPhase = null;
     private int lastBroadcastTicks = -1;
@@ -73,26 +77,21 @@ public class MatchManager {
 
     public void onPlayerJoin(ServerPlayer player) {
         getOrCreate(player);
-        // Отправим список карт
         List<PacketMapList.MapEntry> entries = new ArrayList<>();
         for (MapData m : MapConfig.getMaps().values()) {
             entries.add(new PacketMapList.MapEntry(m.getId(), m.getDisplayName(), m.getModeId()));
         }
         CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new PacketMapList(entries));
-        // Отправим полный maps.json для синхронизации (клиенту не нужен свой файл)
         CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                 new com.csedition.network.PacketSyncMaps(MapConfig.toJson()));
-        // Отправим список режимов
         CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                 new com.csedition.network.PacketSyncModes(ModeConfig.toJson()));
-        // Отправим текущую фазу
         broadcastPhase();
-        // Телепортируем в лобби
         teleportToLobby(player);
     }
 
     public void onPlayerLeave(ServerPlayer player) {
-        // Данные сохраняем, чтобы при возврате не терять статистику
+        // Данные сохраняем
     }
 
     // ====================== Фазы ======================
@@ -107,6 +106,7 @@ public class MatchManager {
         return ModeConfig.getOrDefault(currentModeId);
     }
     public int getPhaseTicks() { return phaseTicks; }
+    public boolean isMatchOver() { return matchOver; }
 
     public void setCurrentMap(String mapId) {
         if (MapConfig.getMap(mapId) != null) {
@@ -136,7 +136,6 @@ public class MatchManager {
     }
 
     public void broadcastPhase() {
-        // Кэшируем пакет — не создаём новый если данные не изменились
         if (cachedPhasePacket == null
                 || phase != lastBroadcastPhase
                 || phaseTicks != lastBroadcastTicks
@@ -161,11 +160,20 @@ public class MatchManager {
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
+
+        // Обработка отложенной очистки после окончания матча
+        if (cleanupTicks > 0) {
+            cleanupTicks--;
+            if (cleanupTicks <= 0) {
+                performMatchEndCleanup();
+            }
+            return;
+        }
+
         if (phase == GamePhase.LOBBY) return;
 
         if (phaseTicks > 0) {
             phaseTicks--;
-            // Каждые 20 тиков (1 сек) обновляем HUD с таймером
             if (phaseTicks % 20 == 0) broadcastPhase();
         }
 
@@ -176,16 +184,9 @@ public class MatchManager {
 
     private void advancePhase() {
         switch (phase) {
-            case BUY_TIME -> {
-                setPhase(GamePhase.FIGHTING);
-            }
-            case FIGHTING -> {
-                // Таймаут — победа CT по умолчанию
-                endRound(Team.CT);
-            }
-            case ROUND_END -> {
-                startNewRound();
-            }
+            case BUY_TIME -> setPhase(GamePhase.FIGHTING);
+            case FIGHTING -> endRound(Team.CT, "TIME_OUT");
+            case ROUND_END -> startNewRound();
             default -> {}
         }
     }
@@ -193,13 +194,11 @@ public class MatchManager {
     // ====================== Раунды ======================
 
     public void startNewRound() {
-        // Проверка минимального количества игроков
         int onlineCount = 0;
         for (UUID uuid : playerDataMap.keySet()) {
             if (getServerPlayer(uuid) != null) onlineCount++;
         }
         if (onlineCount < MIN_PLAYERS) {
-            // Недостаточно игроков — возврат в лобби
             for (UUID uuid : playerDataMap.keySet()) {
                 ServerPlayer sp = getServerPlayer(uuid);
                 if (sp != null) {
@@ -220,7 +219,7 @@ public class MatchManager {
 
         GameMode mode = getCurrentMode();
 
-        // Сброс денег и состояния
+        // Сброс денег и состояния (но НЕ инвентаря — он очищается только после матча)
         for (PlayerData pd : playerDataMap.values()) {
             pd.resetForRound(mode.getStartMoney());
         }
@@ -239,15 +238,55 @@ public class MatchManager {
         setPhase(GamePhase.BUY_TIME);
     }
 
-    public void endRound(Team winner) {
+    /**
+     * Окончание раунда.
+     * @param winner победившая команда (или null при ничьей)
+     * @param reason причина: ELIMINATION, TIME_OUT, TARGET_KILLS
+     */
+    public void endRound(Team winner, String reason) {
         GameMode mode = getCurrentMode();
         for (PlayerData pd : playerDataMap.values()) {
-            if (pd.getTeam() == winner) {
+            if (winner != null && pd.getTeam() == winner) {
                 pd.onRoundWin(mode.getRoundWinReward());
             }
         }
-        // Сообщение
-        Component msg = Component.literal("Round " + roundNumber + " won by " + winner.name());
+
+        // Проверка killsToWin — если кто-то набрал нужное число киллов, матч окончен
+        int killsToWin = CSConfig.getKillsToWin();
+        PlayerData topKiller = null;
+        for (PlayerData pd : playerDataMap.values()) {
+            if (pd.getKills() >= killsToWin && (topKiller == null || pd.getKills() > topKiller.getKills())) {
+                topKiller = pd;
+            }
+        }
+        if (topKiller != null) {
+            // Матч окончен!
+            matchOver = true;
+            Team matchWinner = topKiller.getTeam();
+            String matchReason = "TARGET_KILLS";
+            broadcastRoundEnd(matchWinner, matchReason, roundNumber, topKiller.getKills());
+            // Сообщение
+            for (UUID uuid : playerDataMap.keySet()) {
+                ServerPlayer sp = getServerPlayer(uuid);
+                if (sp != null) {
+                    sp.sendSystemMessage(Component.literal("=== MATCH OVER === " + matchWinner.name() + " wins! (" + matchReason + ")"));
+                    sendMoneyUpdate(sp, playerDataMap.get(uuid));
+                }
+            }
+            setPhase(GamePhase.ROUND_END);
+            // Через 5 сек — телепорт в лобби и очистка инвентаря
+            scheduleMatchEndCleanup();
+            return;
+        }
+
+        // Обычное окончание раунда
+        String reasonText = switch (reason) {
+            case "ELIMINATION" -> "All enemies eliminated";
+            case "TIME_OUT" -> "Time ran out";
+            default -> reason;
+        };
+        broadcastRoundEnd(winner, reason, roundNumber, -1);
+        Component msg = Component.literal("Round " + roundNumber + " won by " + (winner != null ? winner.name() : "DRAW") + " (" + reasonText + ")");
         for (UUID uuid : playerDataMap.keySet()) {
             ServerPlayer sp = getServerPlayer(uuid);
             if (sp != null) {
@@ -256,6 +295,68 @@ public class MatchManager {
             }
         }
         setPhase(GamePhase.ROUND_END);
+    }
+
+    /**
+     * Перегрузка для обратной совместимости.
+     */
+    public void endRound(Team winner) {
+        endRound(winner, "ELIMINATION");
+    }
+
+    private void broadcastRoundEnd(Team winner, String reason, int round, int topKills) {
+        PacketRoundEnd pkt = new PacketRoundEnd(winner != null ? winner.name() : "DRAW", reason, round, topKills);
+        for (UUID uuid : playerDataMap.keySet()) {
+            ServerPlayer sp = getServerPlayer(uuid);
+            if (sp != null) {
+                CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), pkt);
+            }
+        }
+    }
+
+    private int cleanupTicks = -1;
+
+    private void scheduleMatchEndCleanup() {
+        cleanupTicks = 5 * 20; // 5 секунд
+    }
+
+    private void performMatchEndCleanup() {
+        // Очистка инвентаря (с учётом keptItems)
+        for (UUID uuid : playerDataMap.keySet()) {
+            ServerPlayer sp = getServerPlayer(uuid);
+            if (sp == null) continue;
+            if (CSConfig.isClearInventoryOnMatchEnd()) {
+                clearInventoryKeeping(sp);
+            }
+            teleportToLobby(sp);
+        }
+        // Сброс статистики
+        for (PlayerData pd : playerDataMap.values()) {
+            pd.resetStats();
+        }
+        matchOver = false;
+        roundNumber = 0;
+        setPhase(GamePhase.LOBBY);
+    }
+
+    /**
+     * Очищает инвентарь, сохраняя предметы из CSConfig.keptItems.
+     */
+    private void clearInventoryKeeping(ServerPlayer player) {
+        var inv = player.getInventory();
+        // Собираем то, что нужно сохранить
+        List<ItemStack> keep = new ArrayList<>();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            ItemStack stack = inv.getItem(i);
+            if (!stack.isEmpty() && CSConfig.shouldKeepItem(stack.getItem())) {
+                keep.add(stack.copy());
+            }
+        }
+        inv.clearContent();
+        // Возвращаем сохранённые
+        for (ItemStack s : keep) {
+            inv.add(s);
+        }
     }
 
     // ====================== Покупка ======================
@@ -288,20 +389,33 @@ public class MatchManager {
         }
         ItemStack gun = TaczHelper.createGun(gunId);
         if (gun.isEmpty()) {
-            // Возвращаем деньги, если предмет не найден
             pd.addMoney(price);
             player.sendSystemMessage(Component.literal("Weapon not available."));
             return;
         }
-        // Заменяем текущий основной слот (или даём в инвентарь)
+        // Проверка лимита слотов
+        if (!hasInventorySpace(player)) {
+            pd.addMoney(price);
+            player.sendSystemMessage(Component.literal("Inventory full! Max " + CSConfig.getMaxInventorySlots() + " slots."));
+            return;
+        }
         player.getInventory().add(gun);
         sendMoneyUpdate(player, pd);
     }
 
     /**
-     * Быстрая закупка (Z/X/C/4).
-     * Выбирает оружие по типу и покупает, если хватает денег.
+     * Проверяет, есть ли место в инвентаре с учётом лимита слотов.
      */
+    private boolean hasInventorySpace(ServerPlayer player) {
+        int max = CSConfig.getMaxInventorySlots();
+        var inv = player.getInventory();
+        int used = 0;
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            if (!inv.getItem(i).isEmpty()) used++;
+        }
+        return used < max;
+    }
+
     public static void handleQuickBuy(ServerPlayer player, com.csedition.network.PacketQuickBuy.Type type) {
         if (player == null) return;
         MatchManager mm = getInstance();
@@ -324,7 +438,6 @@ public class MatchManager {
         String gunId = null;
         switch (type) {
             case LAST -> {
-                // Последнее купленное — берём из PlayerData
                 gunId = pd.getLastBought();
                 if (gunId == null) {
                     player.sendSystemMessage(Component.literal("No previous purchase."));
@@ -351,13 +464,11 @@ public class MatchManager {
         if (phase != GamePhase.LOBBY) return;
         MapData map = MapConfig.getMap(mapId);
         if (map == null) return;
-        // Проверяем что карта подходит для текущего режима
         if (!map.isForMode(currentModeId)) {
             player.sendSystemMessage(Component.literal("This map is not for the current mode!"));
             return;
         }
         this.currentMapId = mapId;
-        // Распределяем команды: первая половина — T, вторая — CT
         List<UUID> ids = new ArrayList<>(playerDataMap.keySet());
         Collections.sort(ids);
         for (int i = 0; i < ids.size(); i++) {
@@ -365,7 +476,6 @@ public class MatchManager {
             pd.setTeam(i < ids.size() / 2 ? Team.T : Team.CT);
         }
         broadcastPhase();
-        // Сразу запускаем матч
         startNewRound();
     }
 
@@ -376,14 +486,15 @@ public class MatchManager {
         player.teleportTo(lobby.getX() + 0.5, lobby.getY(), lobby.getZ() + 0.5);
     }
 
-    /**
-     * Выдаёт стартовое оружие из режима. Если у режима нет оружия — даёт дефолтное.
-     */
     private void giveBaseLoadout(ServerPlayer player, PlayerData pd, GameMode mode) {
-        player.getInventory().clearContent();
+        // Очищаем инвентарь только если это первый раунд или если включена очистка
+        // По новой логике — инвентарь НЕ очищается между раундами, только после матча
+        // Но при старте нового матча — очищаем
+        if (roundNumber == 1) {
+            clearInventoryKeeping(player);
+        }
         List<String> weapons = mode.getStartWeapons(pd.getTeam());
         if (weapons == null || weapons.isEmpty()) {
-            // Дефолтное оружие
             player.getInventory().add(TaczHelper.createPistol(pd.getTeam() == Team.T));
             player.getInventory().add(TaczHelper.createKnife());
             return;
@@ -409,7 +520,6 @@ public class MatchManager {
         if (vd != null) vd.onDeath();
         if (kd != null) kd.onKill(mode.getKillReward());
         if (killer != null && kd != null) sendMoneyUpdate(killer, kd);
-        // Проверка окончания раунда
         checkRoundEnd();
     }
 
@@ -420,8 +530,8 @@ public class MatchManager {
             if (pd.getTeam() == Team.T) tAlive++;
             else if (pd.getTeam() == Team.CT) ctAlive++;
         }
-        if (tAlive == 0 && ctAlive > 0) endRound(Team.CT);
-        else if (ctAlive == 0 && tAlive > 0) endRound(Team.T);
+        if (tAlive == 0 && ctAlive > 0) endRound(Team.CT, "ELIMINATION");
+        else if (ctAlive == 0 && tAlive > 0) endRound(Team.T, "ELIMINATION");
     }
 
     private ServerPlayer getServerPlayer(UUID uuid) {

@@ -340,15 +340,23 @@ public class MapConfig {
         save();
     }
 
+    /**
+     * Устанавливает зону закупа для команды.
+     * Y автоматически ставится от -60 до 222 (полная высота мира),
+     * XZ берётся из переданных точек.
+     */
     public static void setBuyZone(String mapId, Team team, BlockPos min, BlockPos max) {
         MapData m = MAPS.get(mapId);
         if (m == null) return;
+        // Y всегда от -60 до 222, XZ — из выбранных точек
+        BlockPos realMin = new BlockPos(min.getX(), MapData.BUY_ZONE_Y_MIN, min.getZ());
+        BlockPos realMax = new BlockPos(max.getX(), MapData.BUY_ZONE_Y_MAX, max.getZ());
         MapData updated = new MapData(m.getId(), m.getDisplayName(),
                 m.getTSpawns(), m.getCtSpawns(),
-                team == Team.T ? min : m.getTBuyZoneMin(),
-                team == Team.T ? max : m.getTBuyZoneMax(),
-                team == Team.CT ? min : m.getCtBuyZoneMin(),
-                team == Team.CT ? max : m.getCtBuyZoneMax(),
+                team == Team.T ? realMin : m.getTBuyZoneMin(),
+                team == Team.T ? realMax : m.getTBuyZoneMax(),
+                team == Team.CT ? realMin : m.getCtBuyZoneMin(),
+                team == Team.CT ? realMax : m.getCtBuyZoneMax(),
                 m.getLobbySpawn());
         MAPS.put(mapId, updated);
         cachedJson = null;

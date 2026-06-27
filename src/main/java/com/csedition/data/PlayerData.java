@@ -82,4 +82,15 @@ public class PlayerData {
     public void onRoundWin(int reward) {
         this.addMoney(reward);
     }
+
+    /**
+     * Полный сброс статистики (после окончания матча).
+     */
+    public void resetStats() {
+        this.kills = 0;
+        this.deaths = 0;
+        this.money = DEFAULT_START_MONEY;
+        this.alive = true;
+        this.lastBought = null;
+    }
 }

@@ -8,8 +8,16 @@ import java.util.List;
  * Данные одной карты. Загружаются из maps.json.
  * Содержит спавны для T и CT, раздельные зоны закупа для каждой команды,
  * и привязку к режиму (modeId). Если modeId пустой — карта доступна во всех режимах.
+ *
+ * Зона закупа: по Y всегда от -60 до 222 (полная высота мира),
+ * по XZ выбирается игроком при отметке (две точки).
  */
 public class MapData {
+    /** Минимальная Y-координата зоны закупа (всегда). */
+    public static final int BUY_ZONE_Y_MIN = -60;
+    /** Максимальная Y-координата зоны закупа (всегда). */
+    public static final int BUY_ZONE_Y_MAX = 222;
+
     private final String id;
     private final String displayName;
     private final String modeId; // привязка к режиму (пустая строка = все режимы)
@@ -71,6 +79,7 @@ public class MapData {
 
     /**
      * Проверяет, находится ли позиция внутри зоны закупа для указанной команды.
+     * Y всегда проверяется от -60 до 222, XZ — по выбранным точкам.
      */
     public boolean isInBuyZone(BlockPos pos, Team team) {
         BlockPos min, max;
@@ -81,10 +90,12 @@ public class MapData {
             min = ctBuyZoneMin;
             max = ctBuyZoneMax;
         }
+        if (min == null || max == null) return false;
+        // Y всегда от -60 до 222
+        if (pos.getY() < BUY_ZONE_Y_MIN || pos.getY() > BUY_ZONE_Y_MAX) return false;
+        // XZ — по выбранным точкам
         return pos.getX() >= Math.min(min.getX(), max.getX())
             && pos.getX() <= Math.max(min.getX(), max.getX())
-            && pos.getY() >= Math.min(min.getY(), max.getY())
-            && pos.getY() <= Math.max(min.getY(), max.getY())
             && pos.getZ() >= Math.min(min.getZ(), max.getZ())
             && pos.getZ() <= Math.max(min.getZ(), max.getZ());
     }

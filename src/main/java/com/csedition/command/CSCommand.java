@@ -1,11 +1,13 @@
 package com.csedition.command;
 
+import com.csedition.config.CSConfig;
 import com.csedition.config.MapConfig;
 import com.csedition.config.ModeConfig;
 import com.csedition.data.GameMode;
 import com.csedition.data.GamePhase;
 import com.csedition.data.MapData;
 import com.csedition.data.Team;
+import com.csedition.match.GunPriceTable;
 import com.csedition.match.MatchManager;
 import com.csedition.network.CSPackets;
 import com.csedition.network.PacketMapList;
@@ -147,7 +149,33 @@ public class CSCommand {
                         .then(Commands.literal("spawn").executes(this::testSpawn))
                         .then(Commands.literal("money")
                                 .then(Commands.argument("amount", IntegerArgumentType.integer())
-                                        .executes(this::giveMoney))))
+                                        .executes(this::giveMoney)))
+                        .then(Commands.literal("buy")
+                                .then(Commands.argument("gunId", StringArgumentType.string())
+                                        .executes(ctx -> testBuy(ctx, StringArgumentType.getString(ctx, "gunId")))))
+                        .then(Commands.literal("give")
+                                .then(Commands.argument("gunId", StringArgumentType.string())
+                                        .executes(ctx -> testGive(ctx, StringArgumentType.getString(ctx, "gunId"))))))
+                // === Конфиг ===
+                .then(Commands.literal("config")
+                        .then(Commands.literal("slots")
+                                .then(Commands.argument("amount", IntegerArgumentType.integer())
+                                        .executes(ctx -> configSlots(ctx, IntegerArgumentType.getInteger(ctx, "amount")))))
+                        .then(Commands.literal("kills")
+                                .then(Commands.argument("amount", IntegerArgumentType.integer())
+                                        .executes(ctx -> configKills(ctx, IntegerArgumentType.getInteger(ctx, "amount")))))
+                        .then(Commands.literal("clearinv")
+                                .then(Commands.argument("value", StringArgumentType.string())
+                                        .executes(ctx -> configClearInv(ctx, StringArgumentType.getString(ctx, "value")))))
+                        .then(Commands.literal("kept")
+                                .then(Commands.literal("add")
+                                        .then(Commands.argument("itemId", StringArgumentType.string())
+                                                .executes(ctx -> configKeptAdd(ctx, StringArgumentType.getString(ctx, "itemId")))))
+                                .then(Commands.literal("remove")
+                                        .then(Commands.argument("itemId", StringArgumentType.string())
+                                                .executes(ctx -> configKeptRemove(ctx, StringArgumentType.getString(ctx, "itemId")))))
+                                .then(Commands.literal("list").executes(this::configKeptList)))
+                        .then(Commands.literal("show").executes(this::configShow)))
         );
     }
 
@@ -470,6 +498,93 @@ public class CSCommand {
             ctx.getSource().sendSystemMessage(Component.literal("§cThis command must be run as a player"));
             return 0;
         }
+    }
+
+    // ====================== Тестовые команды магазина ======================
+
+    /**
+     * Тестовая покупка: вызывает реальный handleBuyRequest (с проверкой денег, зоны, фазы).
+     */
+    private int testBuy(CommandContext<CommandSourceStack> ctx, String gunId) {
+        try {
+            ServerPlayer p = ctx.getSource().getPlayerOrException();
+            int price = GunPriceTable.getPrice(gunId);
+            if (price < 0) {
+                p.sendSystemMessage(Component.literal("§cUnknown weapon: " + gunId));
+                return 0;
+            }
+            p.sendSystemMessage(Component.literal("§eAttempting to buy " + gunId + " ($" + price + ")..."));
+            MatchManager.getInstance().handleBuyRequest(p, gunId);
+            return 1;
+        } catch (Exception e) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cThis command must be run as a player"));
+            return 0;
+        }
+    }
+
+    /**
+     * Тестовая выдача: выдаёт оружие бесплатно, без проверок.
+     */
+    private int testGive(CommandContext<CommandSourceStack> ctx, String gunId) {
+        try {
+            ServerPlayer p = ctx.getSource().getPlayerOrException();
+            com.csedition.tacz.TaczHelper.giveGun(p, gunId);
+            p.sendSystemMessage(Component.literal("§aGiven: " + gunId));
+            return 1;
+        } catch (Exception e) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cFailed: " + e.getMessage()));
+            return 0;
+        }
+    }
+
+    // ====================== Конфиг ======================
+
+    private int configSlots(CommandContext<CommandSourceStack> ctx, int amount) {
+        CSConfig.setMaxInventorySlots(amount);
+        ctx.getSource().sendSystemMessage(Component.literal("§aMax inventory slots set to: " + CSConfig.getMaxInventorySlots()));
+        return 1;
+    }
+
+    private int configKills(CommandContext<CommandSourceStack> ctx, int amount) {
+        CSConfig.setKillsToWin(amount);
+        ctx.getSource().sendSystemMessage(Component.literal("§aKills to win set to: " + CSConfig.getKillsToWin()));
+        return 1;
+    }
+
+    private int configClearInv(CommandContext<CommandSourceStack> ctx, String value) {
+        boolean v = value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes") || value.equalsIgnoreCase("on");
+        CSConfig.setClearInventoryOnMatchEnd(v);
+        ctx.getSource().sendSystemMessage(Component.literal("§aClear inventory on match end: " + CSConfig.isClearInventoryOnMatchEnd()));
+        return 1;
+    }
+
+    private int configKeptAdd(CommandContext<CommandSourceStack> ctx, String itemId) {
+        CSConfig.addKeptItem(itemId);
+        ctx.getSource().sendSystemMessage(Component.literal("§aAdded to kept items: " + itemId));
+        return 1;
+    }
+
+    private int configKeptRemove(CommandContext<CommandSourceStack> ctx, String itemId) {
+        CSConfig.removeKeptItem(itemId);
+        ctx.getSource().sendSystemMessage(Component.literal("§aRemoved from kept items: " + itemId));
+        return 1;
+    }
+
+    private int configKeptList(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSystemMessage(Component.literal("§6§l=== Kept Items ==="));
+        for (String s : CSConfig.getKeptItems()) {
+            ctx.getSource().sendSystemMessage(Component.literal("§e" + s));
+        }
+        return 1;
+    }
+
+    private int configShow(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSystemMessage(Component.literal("§6§l=== CS Config ==="));
+        ctx.getSource().sendSystemMessage(Component.literal("§eMax inventory slots: §f" + CSConfig.getMaxInventorySlots()));
+        ctx.getSource().sendSystemMessage(Component.literal("§eKills to win: §f" + CSConfig.getKillsToWin()));
+        ctx.getSource().sendSystemMessage(Component.literal("§eClear inventory on match end: §f" + CSConfig.isClearInventoryOnMatchEnd()));
+        ctx.getSource().sendSystemMessage(Component.literal("§eKept items: §f" + CSConfig.getKeptItems().size()));
+        return 1;
     }
 
     // ====================== Утилиты ======================

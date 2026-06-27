@@ -1,8 +1,7 @@
 package com.csedition.client.screen;
 
+import com.csedition.CSEditionMod;
 import com.csedition.client.ClientState;
-import com.csedition.client.render.CSRenderUtil;
-import com.csedition.config.ModeConfig;
 import com.csedition.network.CSPackets;
 import com.csedition.network.PacketMapList;
 import com.csedition.network.PacketSelectMap;
@@ -11,115 +10,114 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraftforge.network.PacketDistributor;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * GUI выбора карты в лобби.
- * Стиль CS: тёмные панели, оранжевые акценты, угловые элементы.
- * Всё процедурно — никаких PNG.
+ * Экран выбора карты.
+ * Стиль CS: тёмный фон, квадратные кнопки по 3 в ряд, прокрутка колесом мыши.
  *
- * Если передан modeId — показывает только карты для этого режима.
- * Если modeId пустой — показывает все карты.
+ * Карты приходят с сервера через PacketMapList и хранятся в ClientState.mapList.
+ * При клике отправляется PacketSelectMap на сервер.
  */
 public class MapSelectScreen extends Screen {
-    private static final int BTN_W = 240;
-    private static final int BTN_H = 36;
-    private static final int PADDING = 8;
+    private static final int COLS = 3;
+    private static final int BTN_SIZE = 80;
+    private static final int GAP = 12;
+    private static final int PADDING = 20;
+    private static final int HEADER_HEIGHT = 40;
+    private static final int FOOTER_HEIGHT = 30;
 
-    private final Screen parent;
-    private final String modeId;
-    private final List<PacketMapList.MapEntry> filteredMaps = new ArrayList<>();
+    private int scrollOffset = 0;
+    private int maxScroll = 0;
+    private List<PacketMapList.MapEntry> maps;
 
     public MapSelectScreen() {
-        this(null, "");
-    }
-
-    public MapSelectScreen(Screen parent, String modeId) {
         super(Component.literal("Select Map"));
-        this.parent = parent;
-        this.modeId = modeId == null ? "" : modeId;
-        refreshFiltered();
-    }
-
-    private void refreshFiltered() {
-        filteredMaps.clear();
-        for (PacketMapList.MapEntry entry : ClientState.getMapList()) {
-            // Фильтруем по modeId: пустой modeId у карты = подходит для всех режимов
-            if (entry.modeId == null || entry.modeId.isEmpty() || entry.modeId.equals(this.modeId)) {
-                filteredMaps.add(entry);
-            }
-        }
     }
 
     @Override
     protected void init() {
-        refreshFiltered();
-        int cx = this.width / 2;
-        int topY = 60;
-        int rowH = BTN_H + PADDING;
-        int visibleRows = Math.min(filteredMaps.size(), (this.height - 120) / rowH);
-
-        for (int i = 0; i < visibleRows; i++) {
-            PacketMapList.MapEntry entry = filteredMaps.get(i);
-            int y = topY + i * rowH;
-            Button btn = Button.builder(
-                    Component.literal(entry.displayName),
-                    b -> selectMap(entry)
-            ).bounds(cx - BTN_W / 2, y, BTN_W, BTN_H).build();
-            this.addRenderableWidget(btn);
-        }
-
-        // Кнопка "Назад" к выбору режима
-        if (parent != null) {
-            this.addRenderableWidget(Button.builder(
-                    Component.literal("< Back to Modes"),
-                    b -> Minecraft.getInstance().setScreen(parent)
-            ).bounds(10, this.height - 30, 120, 20).build());
-        }
+        super.init();
+        this.maps = ClientState.getMapList();
+        rebuildWidgets();
     }
 
-    private void selectMap(PacketMapList.MapEntry entry) {
-        CSPackets.CHANNEL.sendToServer(new PacketSelectMap(entry.id));
-        this.onClose();
+    private void rebuildWidgets() {
+        clearWidgets();
+        if (maps == null) return;
+
+        int rows = (maps.size() + COLS - 1) / COLS;
+        int gridHeight = rows * BTN_SIZE + (rows - 1) * GAP;
+        int availableHeight = height - HEADER_HEIGHT - FOOTER_HEIGHT - PADDING * 2;
+        maxScroll = Math.max(0, gridHeight - availableHeight);
+
+        int gridWidth = COLS * BTN_SIZE + (COLS - 1) * GAP;
+        int startX = (width - gridWidth) / 2;
+        int startY = HEADER_HEIGHT + PADDING - scrollOffset;
+
+        for (int i = 0; i < maps.size(); i++) {
+            int row = i / COLS;
+            int col = i % COLS;
+            int x = startX + col * (BTN_SIZE + GAP);
+            int y = startY + row * (BTN_SIZE + GAP);
+            PacketMapList.MapEntry entry = maps.get(i);
+            Button btn = Button.builder(
+                    Component.literal(entry.displayName()),
+                    b -> selectMap(entry.id())
+            ).bounds(x, y, BTN_SIZE, BTN_SIZE).build();
+            addRenderableWidget(btn);
+        }
+
+        // Кнопка закрытия
+        int closeY = height - FOOTER_HEIGHT;
+        addRenderableWidget(Button.builder(
+                Component.literal("Close"),
+                b -> Minecraft.getInstance().setScreen(null)
+        ).bounds(width / 2 - 50, closeY, 100, 20).build());
+    }
+
+    private void selectMap(String mapId) {
+        CSEditionMod.LOGGER.info("[CS-Edition] Selecting map: {}", mapId);
+        CSPackets.CHANNEL.sendToServer(new PacketSelectMap(mapId));
+        Minecraft.getInstance().setScreen(null);
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        // Тёмный фон со сканлайнами
-        g.fill(0, 0, this.width, this.height, 0xDD050505);
-        CSRenderUtil.scanlines(g, 0, 0, this.width, this.height, 3);
+        // Тёмный фон
+        g.fill(0, 0, width, height, 0xE0101010);
 
         // Заголовок
         String title = "SELECT MAP";
-        int titleW = this.font.width(title) + 40;
-        CSRenderUtil.csPanel(g, this.width / 2 - titleW / 2, 16, titleW, 32, null, this.font);
-        CSRenderUtil.cornerAccents(g, this.width / 2 - titleW / 2, 16, titleW, 32, 8, CSRenderUtil.CS_ORANGE);
-        g.drawCenteredString(this.font, title, this.width / 2, 28, CSRenderUtil.CS_ORANGE);
+        int titleW = font.width(title);
+        g.drawString(font, title, (width - titleW) / 2, 12, 0xFFFFAA00);
 
-        // Подзаголовок с режимом
-        if (!modeId.isEmpty()) {
-            var mode = ModeConfig.getMode(modeId);
-            String modeName = mode != null ? mode.getDisplayName() : modeId;
-            g.drawCenteredString(this.font, "Mode: " + modeName,
-                    this.width / 2, 52, CSRenderUtil.CS_YELLOW);
+        // Подсказка о прокрутке
+        if (maxScroll > 0) {
+            String hint = "Scroll to see more";
+            int hintW = font.width(hint);
+            g.drawString(font, hint, (width - hintW) / 2, height - FOOTER_HEIGHT - 14, 0xFF888888);
         }
-
-        // Сообщение если нет карт
-        if (filteredMaps.isEmpty()) {
-            g.drawCenteredString(this.font, "No maps for this mode",
-                    this.width / 2, this.height / 2, 0xFF888888);
-            g.drawCenteredString(this.font, "Use /cs addmap to create one",
-                    this.width / 2, this.height / 2 + 15, 0xFF666666);
-        }
-
-        g.drawCenteredString(this.font, "Press ESC to close",
-                this.width / 2, this.height - 8, 0xFF888888);
 
         super.render(g, mouseX, mouseY, partialTick);
     }
 
     @Override
-    public boolean isPauseScreen() { return false; }
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (maxScroll <= 0) return false;
+        int old = scrollOffset;
+        scrollOffset = (int) Math.max(0, Math.min(maxScroll, scrollOffset - delta * 16));
+        if (old != scrollOffset) {
+            rebuildWidgets();
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isPauseScreen() {
+        return false;
+    }
 }
