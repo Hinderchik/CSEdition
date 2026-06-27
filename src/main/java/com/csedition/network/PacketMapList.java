@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * S2C: сервер отправляет клиенту список доступных карт (id + displayName).
+ * S2C: сервер отправляет клиенту список доступных карт (id + displayName + modeId).
  * Используется при входе в лобби для отрисовки GUI выбора карты.
  */
 public class PacketMapList {
@@ -23,6 +23,7 @@ public class PacketMapList {
         for (MapEntry e : msg.maps) {
             buf.writeUtf(e.id);
             buf.writeUtf(e.displayName);
+            buf.writeUtf(e.modeId == null ? "" : e.modeId);
         }
     }
 
@@ -30,7 +31,7 @@ public class PacketMapList {
         int size = buf.readInt();
         List<MapEntry> list = new ArrayList<>();
         for (int i = 0; i < size; i++) {
-            list.add(new MapEntry(buf.readUtf(), buf.readUtf()));
+            list.add(new MapEntry(buf.readUtf(), buf.readUtf(), buf.readUtf()));
         }
         return new PacketMapList(list);
     }
@@ -45,9 +46,11 @@ public class PacketMapList {
     public static class MapEntry {
         public final String id;
         public final String displayName;
-        public MapEntry(String id, String displayName) {
+        public final String modeId;
+        public MapEntry(String id, String displayName, String modeId) {
             this.id = id;
             this.displayName = displayName;
+            this.modeId = modeId == null ? "" : modeId;
         }
     }
 }

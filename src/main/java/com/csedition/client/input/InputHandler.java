@@ -5,6 +5,7 @@ import com.csedition.client.ClientState;
 import com.csedition.client.keybind.KeyBindings;
 import com.csedition.client.screen.BuyMenuScreen;
 import com.csedition.client.screen.MapSelectScreen;
+import com.csedition.client.screen.ModeSelectScreen;
 import com.csedition.data.GamePhase;
 import com.csedition.network.CSPackets;
 import com.csedition.network.PacketQuickBuy;
@@ -45,17 +46,19 @@ public class InputHandler {
         GamePhase phase = ClientState.getPhase();
 
         // === Меню ===
+        // B: в лобби — выбор карты (с фильтром по выбранному режиму), в BUY_TIME — меню закупа
         if (KeyBindings.OPEN_BUY_MENU.consumeClick()) {
             if (phase == GamePhase.LOBBY) {
-                mc.setScreen(new MapSelectScreen());
+                mc.setScreen(new MapSelectScreen(null, ClientState.getSelectedModeId()));
             } else if (phase == GamePhase.BUY_TIME) {
                 mc.setScreen(new BuyMenuScreen());
             }
         }
 
+        // M: в лобби — выбор режима (двухшаговый выбор)
         if (KeyBindings.OPEN_MAP_SELECT.consumeClick()) {
             if (phase == GamePhase.LOBBY) {
-                mc.setScreen(new MapSelectScreen());
+                mc.setScreen(new ModeSelectScreen(null));
             }
         }
 

@@ -6,27 +6,29 @@ import java.util.List;
 
 /**
  * Данные одной карты. Загружаются из maps.json.
- * Содержит спавны для T и CT, а также раздельные зоны закупа для каждой команды.
+ * Содержит спавны для T и CT, раздельные зоны закупа для каждой команды,
+ * и привязку к режиму (modeId). Если modeId пустой — карта доступна во всех режимах.
  */
 public class MapData {
     private final String id;
     private final String displayName;
+    private final String modeId; // привязка к режиму (пустая строка = все режимы)
     private final List<BlockPos> tSpawns;
     private final List<BlockPos> ctSpawns;
-    // Раздельные зоны закупа для каждой команды
     private final BlockPos tBuyZoneMin;
     private final BlockPos tBuyZoneMax;
     private final BlockPos ctBuyZoneMin;
     private final BlockPos ctBuyZoneMax;
     private final BlockPos lobbySpawn;
 
-    public MapData(String id, String displayName,
+    public MapData(String id, String displayName, String modeId,
                    List<BlockPos> tSpawns, List<BlockPos> ctSpawns,
                    BlockPos tBuyZoneMin, BlockPos tBuyZoneMax,
                    BlockPos ctBuyZoneMin, BlockPos ctBuyZoneMax,
                    BlockPos lobbySpawn) {
         this.id = id;
         this.displayName = displayName;
+        this.modeId = modeId == null ? "" : modeId;
         this.tSpawns = tSpawns;
         this.ctSpawns = ctSpawns;
         this.tBuyZoneMin = tBuyZoneMin;
@@ -36,8 +38,21 @@ public class MapData {
         this.lobbySpawn = lobbySpawn;
     }
 
+    /**
+     * Конструктор без modeId (для обратной совместимости).
+     */
+    public MapData(String id, String displayName,
+                   List<BlockPos> tSpawns, List<BlockPos> ctSpawns,
+                   BlockPos tBuyZoneMin, BlockPos tBuyZoneMax,
+                   BlockPos ctBuyZoneMin, BlockPos ctBuyZoneMax,
+                   BlockPos lobbySpawn) {
+        this(id, displayName, "", tSpawns, ctSpawns,
+             tBuyZoneMin, tBuyZoneMax, ctBuyZoneMin, ctBuyZoneMax, lobbySpawn);
+    }
+
     public String getId() { return id; }
     public String getDisplayName() { return displayName; }
+    public String getModeId() { return modeId; }
     public List<BlockPos> getTSpawns() { return tSpawns; }
     public List<BlockPos> getCtSpawns() { return ctSpawns; }
     public BlockPos getLobbySpawn() { return lobbySpawn; }
@@ -45,6 +60,14 @@ public class MapData {
     public BlockPos getTBuyZoneMax() { return tBuyZoneMax; }
     public BlockPos getCtBuyZoneMin() { return ctBuyZoneMin; }
     public BlockPos getCtBuyZoneMax() { return ctBuyZoneMax; }
+
+    /**
+     * Проверяет, подходит ли карта для указанного режима.
+     * Пустой modeId = карта доступна во всех режимах.
+     */
+    public boolean isForMode(String modeId) {
+        return this.modeId == null || this.modeId.isEmpty() || this.modeId.equals(modeId);
+    }
 
     /**
      * Проверяет, находится ли позиция внутри зоны закупа для указанной команды.

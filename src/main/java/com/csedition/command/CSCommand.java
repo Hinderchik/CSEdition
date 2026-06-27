@@ -1,12 +1,16 @@
 package com.csedition.command;
 
 import com.csedition.config.MapConfig;
+import com.csedition.config.ModeConfig;
+import com.csedition.data.GameMode;
+import com.csedition.data.GamePhase;
 import com.csedition.data.MapData;
 import com.csedition.data.Team;
 import com.csedition.match.MatchManager;
 import com.csedition.network.CSPackets;
 import com.csedition.network.PacketMapList;
 import com.csedition.network.PacketSyncMaps;
+import com.csedition.network.PacketSyncModes;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -35,6 +39,11 @@ import java.util.List;
  *   /cs maps            — список карт
  *   /cs money <amount>  — выдать деньги
  *
+ * Управление режимами:
+ *   /cs mode <modeId>   — установить текущий режим
+ *   /cs modes           — список режимов
+ *   /cs setmapmode <mapId> <modeId> — привязать карту к режиму
+ *
  * Редактирование карт (на лету, без перезапуска):
  *   /cs setlobby                    — установить лобби на текущей позиции
  *   /cs addmap <id> [name]          — создать/обновить карту
@@ -44,6 +53,12 @@ import java.util.List;
  *   /cs setbuyzone <mapId> <T|CT>   — установить зону закупа (2 точки)
  *   /cs reload                     — перечитать maps.json с диска
  *
+ * Тестовые команды (для отладки):
+ *   /cs test phase <phase>  — принудительно установить фазу
+ *   /cs test team <T|CT>    — установить команду
+ *   /cs test spawn          — телепорт на спавн текущей карты
+ *   /cs test money <amount> — выдать деньги
+ *
  * Все изменения автоматически:
  *   - Сохраняются в &lt;world&gt;/data/csedition/maps.json
  *   - Рассылаются всем клиентам через PacketSyncMaps
@@ -52,6 +67,9 @@ public class CSCommand {
 
     private static final SuggestionProvider<CommandSourceStack> MAP_SUGGESTIONS = (ctx, builder) ->
         SharedSuggestionProvider.suggest(MapConfig.getMaps().keySet(), builder);
+
+    private static final SuggestionProvider<CommandSourceStack> MODE_SUGGESTIONS = (ctx, builder) ->
+        SharedSuggestionProvider.suggest(ModeConfig.getModes().keySet(), builder);
 
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
@@ -69,6 +87,20 @@ public class CSCommand {
                 .then(Commands.literal("money")
                         .then(Commands.argument("amount", IntegerArgumentType.integer())
                                 .executes(this::giveMoney)))
+                // === Режимы ===
+                .then(Commands.literal("mode")
+                        .then(Commands.argument("modeId", StringArgumentType.string())
+                                .suggests(MODE_SUGGESTIONS)
+                                .executes(ctx -> setMode(ctx, StringArgumentType.getString(ctx, "modeId")))))
+                .then(Commands.literal("modes").executes(this::listModes))
+                .then(Commands.literal("setmapmode")
+                        .then(Commands.argument("mapId", StringArgumentType.string())
+                                .suggests(MAP_SUGGESTIONS)
+                                .then(Commands.argument("modeId", StringArgumentType.string())
+                                        .suggests(MODE_SUGGESTIONS)
+                                        .executes(ctx -> setMapMode(ctx,
+                                                StringArgumentType.getString(ctx, "mapId"),
+                                                StringArgumentType.getString(ctx, "modeId"))))))
                 // === Редактирование карт ===
                 .then(Commands.literal("setlobby").executes(this::setLobby))
                 .then(Commands.literal("addmap")
@@ -104,6 +136,18 @@ public class CSCommand {
                                                 StringArgumentType.getString(ctx, "mapId"),
                                                 StringArgumentType.getString(ctx, "team"))))))
                 .then(Commands.literal("reload").executes(this::reload))
+                // === Тестовые команды ===
+                .then(Commands.literal("test")
+                        .then(Commands.literal("phase")
+                                .then(Commands.argument("phase", StringArgumentType.string())
+                                        .executes(ctx -> testPhase(ctx, StringArgumentType.getString(ctx, "phase")))))
+                        .then(Commands.literal("team")
+                                .then(Commands.argument("team", StringArgumentType.string())
+                                        .executes(ctx -> testTeam(ctx, StringArgumentType.getString(ctx, "team")))))
+                        .then(Commands.literal("spawn").executes(this::testSpawn))
+                        .then(Commands.literal("money")
+                                .then(Commands.argument("amount", IntegerArgumentType.integer())
+                                        .executes(this::giveMoney))))
         );
     }
 
@@ -116,6 +160,10 @@ public class CSCommand {
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs status§7 — статус"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs maps§7 — список карт"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs money <amount>§7 — выдать деньги"));
+        ctx.getSource().sendSystemMessage(Component.literal("§6§l--- Режимы ---"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs mode <modeId>§7 — установить режим"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs modes§7 — список режимов"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs setmapmode <mapId> <modeId>§7 — привязать карту"));
         ctx.getSource().sendSystemMessage(Component.literal("§6§l--- Редактирование карт ---"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs setlobby§7 — лобби = ваша позиция"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs addmap <id> [name]§7 — создать карту"));
@@ -124,7 +172,12 @@ public class CSCommand {
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs clearspawns <mapId> <T|CT>§7 — очистить"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs setbuyzone <mapId> <T|CT>§7 — зона закупа"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs reload§7 — перечитать maps.json"));
-        ctx.getSource().sendSystemMessage(Component.literal("§7Файл: §f" + MapConfig.getCurrentFile()));
+        ctx.getSource().sendSystemMessage(Component.literal("§6§l--- Тест ---"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs test phase <LOBBY|BUY_TIME|FIGHTING|ROUND_END>§7"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs test team <T|CT>§7"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs test spawn§7 — телепорт на спавн"));
+        ctx.getSource().sendSystemMessage(Component.literal("§7Файл карт: §f" + MapConfig.getCurrentFile()));
+        ctx.getSource().sendSystemMessage(Component.literal("§7Файл режимов: §f" + ModeConfig.getCurrentFile()));
         return 1;
     }
 
@@ -142,13 +195,14 @@ public class CSCommand {
             return 0;
         }
         mm.startNewRound();
-        ctx.getSource().sendSystemMessage(Component.literal("§aMatch started on map: " + mm.getCurrentMapId()));
+        ctx.getSource().sendSystemMessage(Component.literal("§aMatch started on map: " + mm.getCurrentMapId()
+                + " (mode: " + mm.getCurrentModeId() + ")"));
         return 1;
     }
 
     private int stop(CommandContext<CommandSourceStack> ctx) {
         MatchManager mm = MatchManager.getInstance();
-        mm.setPhase(com.csedition.data.GamePhase.LOBBY);
+        mm.setPhase(GamePhase.LOBBY);
         for (ServerPlayer p : ctx.getSource().getServer().getPlayerList().getPlayers()) {
             mm.teleportToLobby(p);
         }
@@ -160,6 +214,7 @@ public class CSCommand {
         MatchManager mm = MatchManager.getInstance();
         ctx.getSource().sendSystemMessage(Component.literal("§6Phase: §f" + mm.getPhase()));
         ctx.getSource().sendSystemMessage(Component.literal("§6Map: §f" + mm.getCurrentMapId()));
+        ctx.getSource().sendSystemMessage(Component.literal("§6Mode: §f" + mm.getCurrentModeId()));
         ctx.getSource().sendSystemMessage(Component.literal("§6Timer: §f" + (mm.getPhaseTicks() / 20) + "s"));
         ctx.getSource().sendSystemMessage(Component.literal("§6Players: §f" + ctx.getSource().getServer().getPlayerList().getPlayerCount()));
         return 1;
@@ -168,8 +223,10 @@ public class CSCommand {
     private int listMaps(CommandContext<CommandSourceStack> ctx) {
         ctx.getSource().sendSystemMessage(Component.literal("§6§l=== Maps ==="));
         for (MapData m : MapConfig.getMaps().values()) {
+            String mode = m.getModeId().isEmpty() ? "any" : m.getModeId();
             ctx.getSource().sendSystemMessage(Component.literal(
-                "§e" + m.getId() + " §7(" + m.getDisplayName() + ") §fT:" + m.getTSpawns().size() + " CT:" + m.getCtSpawns().size()));
+                "§e" + m.getId() + " §7(" + m.getDisplayName() + ") §fmode=" + mode
+                + " T:" + m.getTSpawns().size() + " CT:" + m.getCtSpawns().size()));
         }
         return 1;
     }
@@ -188,6 +245,45 @@ public class CSCommand {
             ctx.getSource().sendSystemMessage(Component.literal("§cThis command must be run as a player"));
             return 0;
         }
+    }
+
+    // ====================== Режимы ======================
+
+    private int setMode(CommandContext<CommandSourceStack> ctx, String modeId) {
+        if (ModeConfig.getMode(modeId) == null) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cUnknown mode: " + modeId));
+            return 0;
+        }
+        MatchManager.getInstance().setCurrentMode(modeId);
+        ctx.getSource().sendSystemMessage(Component.literal("§aMode set to: " + modeId));
+        return 1;
+    }
+
+    private int listModes(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSystemMessage(Component.literal("§6§l=== Game Modes ==="));
+        for (GameMode m : ModeConfig.getModes().values()) {
+            String tag = m.isBuiltIn() ? "" : " §7(custom)";
+            ctx.getSource().sendSystemMessage(Component.literal(
+                "§e" + m.getId() + " §7(" + m.getDisplayName() + ")" + tag
+                + " §fbuy=" + m.getBuyTimeSeconds() + "s round=" + m.getRoundTimeSeconds() + "s"
+                + " start=$" + m.getStartMoney()));
+        }
+        return 1;
+    }
+
+    private int setMapMode(CommandContext<CommandSourceStack> ctx, String mapId, String modeId) {
+        if (MapConfig.getMap(mapId) == null) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cUnknown map: " + mapId));
+            return 0;
+        }
+        if (!modeId.isEmpty() && ModeConfig.getMode(modeId) == null) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cUnknown mode: " + modeId + " (use empty string to clear)"));
+            return 0;
+        }
+        MapConfig.setMapMode(mapId, modeId);
+        broadcastMaps();
+        ctx.getSource().sendSystemMessage(Component.literal("§aMap " + mapId + " mode set to: " + (modeId.isEmpty() ? "any" : modeId)));
+        return 1;
     }
 
     // ====================== Редактирование карт ======================
@@ -284,7 +380,6 @@ public class CSCommand {
             BlockPos current = p.blockPosition();
             BlockPos min, max;
             if (team == Team.T) {
-                // Если min ещё не задан (равен max), это первая точка
                 if (m.getTBuyZoneMin().equals(m.getTBuyZoneMax())) {
                     min = current;
                     max = current;
@@ -316,9 +411,65 @@ public class CSCommand {
 
     private int reload(CommandContext<CommandSourceStack> ctx) {
         MapConfig.load();
+        ModeConfig.load();
         broadcastMaps();
-        ctx.getSource().sendSystemMessage(Component.literal("§aMaps reloaded from " + MapConfig.getCurrentFile()));
+        broadcastModes();
+        ctx.getSource().sendSystemMessage(Component.literal("§aMaps and modes reloaded"));
         return 1;
+    }
+
+    // ====================== Тестовые команды ======================
+
+    private int testPhase(CommandContext<CommandSourceStack> ctx, String phaseStr) {
+        GamePhase phase;
+        try {
+            phase = GamePhase.valueOf(phaseStr.toUpperCase());
+        } catch (Exception e) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cInvalid phase. Use: LOBBY, BUY_TIME, FIGHTING, ROUND_END"));
+            return 0;
+        }
+        MatchManager.getInstance().setPhase(phase);
+        ctx.getSource().sendSystemMessage(Component.literal("§aPhase set to: " + phase));
+        return 1;
+    }
+
+    private int testTeam(CommandContext<CommandSourceStack> ctx, String teamStr) {
+        try {
+            ServerPlayer p = ctx.getSource().getPlayerOrException();
+            Team team = parseTeam(teamStr);
+            if (team == null) {
+                p.sendSystemMessage(Component.literal("§cTeam must be T or CT"));
+                return 0;
+            }
+            MatchManager mm = MatchManager.getInstance();
+            mm.getOrCreate(p).setTeam(team);
+            p.sendSystemMessage(Component.literal("§aTeam set to: " + team));
+            return 1;
+        } catch (Exception e) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cThis command must be run as a player"));
+            return 0;
+        }
+    }
+
+    private int testSpawn(CommandContext<CommandSourceStack> ctx) {
+        try {
+            ServerPlayer p = ctx.getSource().getPlayerOrException();
+            MatchManager mm = MatchManager.getInstance();
+            MapData map = mm.getCurrentMap();
+            if (map == null) {
+                p.sendSystemMessage(Component.literal("§cNo map selected"));
+                return 0;
+            }
+            Team team = mm.getOrCreate(p).getTeam();
+            if (team == Team.NONE) team = Team.T;
+            BlockPos spawn = map.getRandomSpawn(team, new java.util.Random());
+            p.teleportTo(spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5);
+            p.sendSystemMessage(Component.literal("§aTeleported to " + team + " spawn: " + spawn));
+            return 1;
+        } catch (Exception e) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cThis command must be run as a player"));
+            return 0;
+        }
     }
 
     // ====================== Утилиты ======================
@@ -336,17 +487,25 @@ public class CSCommand {
      * Вызывается после любого изменения.
      */
     private void broadcastMaps() {
-        // Список карт
         List<PacketMapList.MapEntry> entries = new ArrayList<>();
         for (MapData m : MapConfig.getMaps().values()) {
-            entries.add(new PacketMapList.MapEntry(m.getId(), m.getDisplayName()));
+            entries.add(new PacketMapList.MapEntry(m.getId(), m.getDisplayName(), m.getModeId()));
         }
         PacketMapList listPkt = new PacketMapList(entries);
-        // Полный JSON
         PacketSyncMaps jsonPkt = new PacketSyncMaps(MapConfig.toJson());
         for (ServerPlayer p : net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer().getPlayerList().getPlayers()) {
             CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), listPkt);
             CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), jsonPkt);
+        }
+    }
+
+    /**
+     * Рассылает обновлённые режимы всем клиентам.
+     */
+    private void broadcastModes() {
+        PacketSyncModes pkt = new PacketSyncModes(ModeConfig.toJson());
+        for (ServerPlayer p : net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer().getPlayerList().getPlayers()) {
+            CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), pkt);
         }
     }
 }

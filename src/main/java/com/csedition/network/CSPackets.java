@@ -43,5 +43,7 @@ public class CSPackets {
                 PacketQuickBuy::encode, PacketQuickBuy::decode, PacketQuickBuy::handle);
         CHANNEL.registerMessage(id++, PacketSyncMaps.class,
                 PacketSyncMaps::encode, PacketSyncMaps::decode, PacketSyncMaps::handle);
+        CHANNEL.registerMessage(id++, PacketSyncModes.class,
+                PacketSyncModes::encode, PacketSyncModes::decode, PacketSyncModes::handle);
     }
 }

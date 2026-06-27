@@ -5,15 +5,17 @@ import java.util.UUID;
 /**
  * Серверские данные игрока в матче.
  * Хранятся в MatchManager.playerDataMap.
+ *
+ * Деньги и награды теперь параметризованы через GameMode.
  */
 public class PlayerData {
-    public static final int START_MONEY = 800;
-    public static final int KILL_REWARD = 300;
-    public static final int ROUND_WIN_REWARD = 3000;
+    public static final int DEFAULT_START_MONEY = 800;
+    public static final int DEFAULT_KILL_REWARD = 300;
+    public static final int DEFAULT_ROUND_WIN_REWARD = 3000;
 
     private final UUID playerId;
     private Team team = Team.NONE;
-    private int money = START_MONEY;
+    private int money = DEFAULT_START_MONEY;
     private int kills = 0;
     private int deaths = 0;
     private boolean alive = true;
@@ -40,22 +42,44 @@ public class PlayerData {
     public String getLastBought() { return lastBought; }
     public void setLastBought(String lastBought) { this.lastBought = lastBought; }
 
-    public void resetForRound() {
-        this.money = START_MONEY;
+    /**
+     * Сбрасывает состояние для нового раунда.
+     * @param startMoney стартовое количество денег (из режима)
+     */
+    public void resetForRound(int startMoney) {
+        this.money = startMoney;
         this.alive = true;
     }
 
-    public void onKill() {
-        this.kills++;
-        this.addMoney(KILL_REWARD);
+    /**
+     * Сбрасывает состояние для нового раунда (дефолтные деньги).
+     */
+    public void resetForRound() {
+        resetForRound(DEFAULT_START_MONEY);
     }
 
+    /**
+     * Вызывается при убийстве. Добавляет награду.
+     * @param reward количество денег за убийство (из режима)
+     */
+    public void onKill(int reward) {
+        this.kills++;
+        this.addMoney(reward);
+    }
+
+    /**
+     * Вызывается при смерти.
+     */
     public void onDeath() {
         this.deaths++;
         this.alive = false;
     }
 
-    public void onRoundWin() {
-        this.addMoney(ROUND_WIN_REWARD);
+    /**
+     * Вызывается при победе в раунде.
+     * @param reward количество денег за победу (из режима)
+     */
+    public void onRoundWin(int reward) {
+        this.addMoney(reward);
     }
 }

@@ -124,7 +124,8 @@ public class MapConfig {
                         BlockPos tMax = parsePos(obj.getAsJsonArray("tBuyZoneMax"));
                         BlockPos ctMin = parsePos(obj.getAsJsonArray("ctBuyZoneMin"));
                         BlockPos ctMax = parsePos(obj.getAsJsonArray("ctBuyZoneMax"));
-                        MAPS.put(id, new MapData(id, name, tSpawns, ctSpawns,
+                        String modeId = obj.has("modeId") ? obj.get("modeId").getAsString() : "";
+                        MAPS.put(id, new MapData(id, name, modeId, tSpawns, ctSpawns,
                                 tMin, tMax, ctMin, ctMax, lobbySpawn));
                         CSEditionMod.LOGGER.info("[CS-Edition] Loaded map: {} ({})", id, name);
                     } catch (Exception e) {
@@ -177,6 +178,7 @@ public class MapConfig {
             JsonObject obj = new JsonObject();
             obj.addProperty("id", m.getId());
             obj.addProperty("displayName", m.getDisplayName());
+            obj.addProperty("modeId", m.getModeId());
             obj.add("tSpawns", posListToJson(m.getTSpawns()));
             obj.add("ctSpawns", posListToJson(m.getCtSpawns()));
             obj.add("tBuyZoneMin", posToJson(m.getTBuyZoneMin()));
@@ -261,10 +263,14 @@ public class MapConfig {
     }
 
     public static void addOrUpdateMap(String id, String displayName) {
+        addOrUpdateMap(id, displayName, "");
+    }
+
+    public static void addOrUpdateMap(String id, String displayName, String modeId) {
         MapData existing = MAPS.get(id);
         if (existing != null) {
-            // Обновляем имя, спавны и зоны оставляем
-            MapData updated = new MapData(id, displayName,
+            // Обновляем имя и modeId, спавны и зоны оставляем
+            MapData updated = new MapData(id, displayName, modeId,
                     existing.getTSpawns(), existing.getCtSpawns(),
                     existing.getTBuyZoneMin(), existing.getTBuyZoneMax(),
                     existing.getCtBuyZoneMin(), existing.getCtBuyZoneMax(),
@@ -273,7 +279,7 @@ public class MapConfig {
         } else {
             // Новая карта с дефолтными значениями вокруг лобби
             BlockPos base = lobbySpawn;
-            MapData newMap = new MapData(id, displayName,
+            MapData newMap = new MapData(id, displayName, modeId,
                     new ArrayList<>(List.of(base.offset(10, 0, 10))),
                     new ArrayList<>(List.of(base.offset(-10, 0, -10))),
                     base.offset(5, -5, 5), base.offset(15, 15, 15),
@@ -281,6 +287,19 @@ public class MapConfig {
                     lobbySpawn);
             MAPS.put(id, newMap);
         }
+        cachedJson = null;
+        save();
+    }
+
+    public static void setMapMode(String mapId, String modeId) {
+        MapData m = MAPS.get(mapId);
+        if (m == null) return;
+        MapData updated = new MapData(m.getId(), m.getDisplayName(), modeId,
+                m.getTSpawns(), m.getCtSpawns(),
+                m.getTBuyZoneMin(), m.getTBuyZoneMax(),
+                m.getCtBuyZoneMin(), m.getCtBuyZoneMax(),
+                m.getLobbySpawn());
+        MAPS.put(mapId, updated);
         cachedJson = null;
         save();
     }

@@ -2,6 +2,8 @@ package com.csedition.match;
 
 import com.csedition.CSEditionMod;
 import com.csedition.config.MapConfig;
+import com.csedition.config.ModeConfig;
+import com.csedition.data.GameMode;
 import com.csedition.data.GamePhase;
 import com.csedition.data.MapData;
 import com.csedition.data.PlayerData;
@@ -28,6 +30,7 @@ import java.util.*;
  * Состояние:
  *   - phase: текущая фаза (LOBBY / BUY_TIME / FIGHTING / ROUND_END)
  *   - currentMapId: id выбранной карты
+ *   - currentModeId: id выбранного режима
  *   - phaseTicks: оставшееся время фазы в тиках
  *   - playerDataMap: данные игроков (UUID -> PlayerData)
  *   - roundNumber: номер текущего раунда
@@ -35,18 +38,16 @@ import java.util.*;
  * Синхронизация с клиентом:
  *   - При смене фазы рассылает PacketPhaseUpdate всем игрокам.
  *   - При изменении денег/убийств отправляет PacketMoneyUpdate конкретному игроку.
- *   - При входе игрока отправляет PacketMapList со списком карт.
+ *   - При входе игрока отправляет PacketMapList со списком карт и PacketSyncModes.
  */
 public class MatchManager {
     private static final MatchManager INSTANCE = new MatchManager();
 
-    public static final int BUY_TIME_TICKS = 15 * 20;   // 15 секунд
-    public static final int FIGHTING_TICKS = 120 * 20;  // 2 минуты
-    public static final int ROUND_END_TICKS = 5 * 20;   // 5 секунд
     public static final int MIN_PLAYERS = 2;            // Минимум 2 игрока для старта
 
     private GamePhase phase = GamePhase.LOBBY;
     private String currentMapId = null;
+    private String currentModeId = "classic";
     private int phaseTicks = 0;
     private int roundNumber = 0;
     private final Map<UUID, PlayerData> playerDataMap = new HashMap<>();
@@ -56,6 +57,7 @@ public class MatchManager {
     private GamePhase lastBroadcastPhase = null;
     private int lastBroadcastTicks = -1;
     private String lastBroadcastMap = null;
+    private String lastBroadcastMode = null;
 
     private MatchManager() {}
 
@@ -74,12 +76,15 @@ public class MatchManager {
         // Отправим список карт
         List<PacketMapList.MapEntry> entries = new ArrayList<>();
         for (MapData m : MapConfig.getMaps().values()) {
-            entries.add(new PacketMapList.MapEntry(m.getId(), m.getDisplayName()));
+            entries.add(new PacketMapList.MapEntry(m.getId(), m.getDisplayName(), m.getModeId()));
         }
         CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new PacketMapList(entries));
         // Отправим полный maps.json для синхронизации (клиенту не нужен свой файл)
         CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                 new com.csedition.network.PacketSyncMaps(MapConfig.toJson()));
+        // Отправим список режимов
+        CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new com.csedition.network.PacketSyncModes(ModeConfig.toJson()));
         // Отправим текущую фазу
         broadcastPhase();
         // Телепортируем в лобби
@@ -94,8 +99,12 @@ public class MatchManager {
 
     public GamePhase getPhase() { return phase; }
     public String getCurrentMapId() { return currentMapId; }
+    public String getCurrentModeId() { return currentModeId; }
     public MapData getCurrentMap() {
         return currentMapId == null ? null : MapConfig.getMap(currentMapId);
+    }
+    public GameMode getCurrentMode() {
+        return ModeConfig.getOrDefault(currentModeId);
     }
     public int getPhaseTicks() { return phaseTicks; }
 
@@ -106,16 +115,24 @@ public class MatchManager {
         }
     }
 
+    public void setCurrentMode(String modeId) {
+        if (ModeConfig.getMode(modeId) != null) {
+            this.currentModeId = modeId;
+            broadcastPhase();
+        }
+    }
+
     public void setPhase(GamePhase newPhase) {
         this.phase = newPhase;
+        GameMode mode = getCurrentMode();
         switch (newPhase) {
-            case BUY_TIME -> this.phaseTicks = BUY_TIME_TICKS;
-            case FIGHTING -> this.phaseTicks = FIGHTING_TICKS;
-            case ROUND_END -> this.phaseTicks = ROUND_END_TICKS;
+            case BUY_TIME -> this.phaseTicks = mode.getBuyTimeSeconds() * 20;
+            case FIGHTING -> this.phaseTicks = mode.getRoundTimeSeconds() * 20;
+            case ROUND_END -> this.phaseTicks = 5 * 20;
             default -> this.phaseTicks = 0;
         }
         broadcastPhase();
-        CSEditionMod.LOGGER.info("[CS-Edition] Phase -> {} ({} ticks)", newPhase, phaseTicks);
+        CSEditionMod.LOGGER.info("[CS-Edition] Phase -> {} ({} ticks, mode={})", newPhase, phaseTicks, currentModeId);
     }
 
     public void broadcastPhase() {
@@ -123,11 +140,13 @@ public class MatchManager {
         if (cachedPhasePacket == null
                 || phase != lastBroadcastPhase
                 || phaseTicks != lastBroadcastTicks
-                || currentMapId != lastBroadcastMap) {
-            cachedPhasePacket = new PacketPhaseUpdate(phase, phaseTicks, currentMapId);
+                || currentMapId != lastBroadcastMap
+                || !Objects.equals(currentModeId, lastBroadcastMode)) {
+            cachedPhasePacket = new PacketPhaseUpdate(phase, phaseTicks, currentMapId, currentModeId);
             lastBroadcastPhase = phase;
             lastBroadcastTicks = phaseTicks;
             lastBroadcastMap = currentMapId;
+            lastBroadcastMode = currentModeId;
         }
         for (UUID uuid : playerDataMap.keySet()) {
             ServerPlayer sp = getServerPlayer(uuid);
@@ -199,9 +218,11 @@ public class MatchManager {
             return;
         }
 
+        GameMode mode = getCurrentMode();
+
         // Сброс денег и состояния
         for (PlayerData pd : playerDataMap.values()) {
-            pd.resetForRound();
+            pd.resetForRound(mode.getStartMoney());
         }
 
         // Телепорт и выдача оружия
@@ -211,7 +232,7 @@ public class MatchManager {
             PlayerData pd = playerDataMap.get(uuid);
             BlockPos spawn = map.getRandomSpawn(pd.getTeam(), random);
             sp.teleportTo(spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5);
-            giveBaseLoadout(sp, pd);
+            giveBaseLoadout(sp, pd, mode);
             sendMoneyUpdate(sp, pd);
         }
 
@@ -219,9 +240,10 @@ public class MatchManager {
     }
 
     public void endRound(Team winner) {
+        GameMode mode = getCurrentMode();
         for (PlayerData pd : playerDataMap.values()) {
             if (pd.getTeam() == winner) {
-                pd.onRoundWin();
+                pd.onRoundWin(mode.getRoundWinReward());
             }
         }
         // Сообщение
@@ -240,6 +262,11 @@ public class MatchManager {
 
     public void handleBuyRequest(ServerPlayer player, String gunId) {
         if (player == null) return;
+        GameMode mode = getCurrentMode();
+        if (!mode.isAllowBuy()) {
+            player.sendSystemMessage(Component.literal("Buying is disabled in this mode!"));
+            return;
+        }
         if (phase != GamePhase.BUY_TIME) {
             player.sendSystemMessage(Component.literal("Buy time is over!"));
             return;
@@ -278,6 +305,11 @@ public class MatchManager {
     public static void handleQuickBuy(ServerPlayer player, com.csedition.network.PacketQuickBuy.Type type) {
         if (player == null) return;
         MatchManager mm = getInstance();
+        GameMode mode = mm.getCurrentMode();
+        if (!mode.isAllowBuy()) {
+            player.sendSystemMessage(Component.literal("Buying is disabled in this mode!"));
+            return;
+        }
         if (mm.phase != GamePhase.BUY_TIME) {
             player.sendSystemMessage(Component.literal("Buy time is over!"));
             return;
@@ -317,7 +349,13 @@ public class MatchManager {
 
     public void handleMapSelect(ServerPlayer player, String mapId) {
         if (phase != GamePhase.LOBBY) return;
-        if (MapConfig.getMap(mapId) == null) return;
+        MapData map = MapConfig.getMap(mapId);
+        if (map == null) return;
+        // Проверяем что карта подходит для текущего режима
+        if (!map.isForMode(currentModeId)) {
+            player.sendSystemMessage(Component.literal("This map is not for the current mode!"));
+            return;
+        }
         this.currentMapId = mapId;
         // Распределяем команды: первая половина — T, вторая — CT
         List<UUID> ids = new ArrayList<>(playerDataMap.keySet());
@@ -338,10 +376,24 @@ public class MatchManager {
         player.teleportTo(lobby.getX() + 0.5, lobby.getY(), lobby.getZ() + 0.5);
     }
 
-    private void giveBaseLoadout(ServerPlayer player, PlayerData pd) {
+    /**
+     * Выдаёт стартовое оружие из режима. Если у режима нет оружия — даёт дефолтное.
+     */
+    private void giveBaseLoadout(ServerPlayer player, PlayerData pd, GameMode mode) {
         player.getInventory().clearContent();
-        player.getInventory().add(TaczHelper.createPistol(pd.getTeam() == Team.T));
-        player.getInventory().add(TaczHelper.createKnife());
+        List<String> weapons = mode.getStartWeapons(pd.getTeam());
+        if (weapons == null || weapons.isEmpty()) {
+            // Дефолтное оружие
+            player.getInventory().add(TaczHelper.createPistol(pd.getTeam() == Team.T));
+            player.getInventory().add(TaczHelper.createKnife());
+            return;
+        }
+        for (String gunId : weapons) {
+            ItemStack gun = TaczHelper.createGun(gunId);
+            if (!gun.isEmpty()) {
+                player.getInventory().add(gun);
+            }
+        }
     }
 
     public void sendMoneyUpdate(ServerPlayer player, PlayerData pd) {
@@ -351,10 +403,11 @@ public class MatchManager {
 
     public void onPlayerKill(ServerPlayer victim, ServerPlayer killer) {
         if (phase != GamePhase.FIGHTING) return;
+        GameMode mode = getCurrentMode();
         PlayerData vd = get(victim.getUUID());
         PlayerData kd = get(killer.getUUID());
         if (vd != null) vd.onDeath();
-        if (kd != null) kd.onKill();
+        if (kd != null) kd.onKill(mode.getKillReward());
         if (killer != null && kd != null) sendMoneyUpdate(killer, kd);
         // Проверка окончания раунда
         checkRoundEnd();
