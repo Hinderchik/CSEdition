@@ -65,14 +65,12 @@ public class CSHudOverlay {
 
     /**
      * Public render method called by the custom overlay
-     * (registered via RegisterGuiOverlaysEvent) AND by the Post
-     * event handler below. Both paths call this method.
+     * (registered via RegisterGuiOverlaysEvent).
      *
-     * Previously we drew in Post of minecraft:hotbar, but canceling
-     * Pre in some Forge versions prevents Post from firing.
-     * Solution: draw in Post of minecraft:crosshair (which we never
-     * cancel) — Post always fires regardless of Pre, so our HUD
-     * renders on top every frame.
+     * Previously we ALSO drew in Post of minecraft:crosshair as a fallback,
+     * but that caused double-rendering (render() called twice per frame),
+     * which made items disappear when selected. Now we use ONLY the
+     * custom overlay — it's guaranteed to fire exactly once per frame.
      */
     public void render(GuiGraphics g) {
         if (ClientState.getPhase() == GamePhase.LOBBY) return;
@@ -90,17 +88,6 @@ public class CSHudOverlay {
         drawHotbar(g, w, h, mc.player, layout);
     }
 
-    /**
-     * Fallback render path — fires every frame in Post of minecraft:crosshair.
-     * This overlay is never canceled, so Post always fires.
-     * Our HUD draws on top of the crosshair.
-     */
-    @SubscribeEvent
-    public void onRenderCrosshairPost(RenderGuiOverlayEvent.Post event) {
-        if (!"minecraft:crosshair".equals(event.getOverlay().id().toString())) return;
-        render(event.getGuiGraphics());
-    }
-
     private void drawHealthArmor(GuiGraphics g, int w, int h, Player p, Layout layout) {
         Font font = Minecraft.getInstance().font;
         int x = layout.padLeft;
@@ -111,25 +98,21 @@ public class CSHudOverlay {
         float health = p.getHealth();
         float healthRatio = maxHp > 0 ? Math.max(0, health / maxHp) : 0;
         int armor = p.getArmorValue();
+        float armorRatio = armor > 0 ? Math.min(1f, armor / 20f) : 0;
 
-        boolean healthChanged = healthRatio != lastHealthRatio;
-        boolean armorChanged = armor != lastArmorValue;
+        // Фон и заливка рисуем КАЖДЫЙ кадр (frame buffer очищается каждый кадр).
+        // Кэш только для текста — текст "20" / "15" не меняется каждый кадр.
+        drawCsBar(g, x, layout.hpY, barW, barH, healthRatio, CSRenderUtil.CS_RED, "HP");
+        drawCsBar(g, x, layout.apY, barW, barH, armorRatio, CSRenderUtil.CS_BLUE, "AP");
 
-        if (healthChanged) {
-            drawCsBar(g, x, layout.hpY, barW, barH, healthRatio, CSRenderUtil.CS_RED, "HP");
-            lastHealthRatio = healthRatio;
+        int hpInt = (int) health;
+        if (hpInt != lastHpInt) {
+            g.drawString(font, String.valueOf(hpInt), x + barW + 4, layout.hpY, 0xFFFFFFFF);
+            lastHpInt = hpInt;
         }
-        if (armorChanged) {
-            float armorRatio = armor > 0 ? Math.min(1f, armor / 20f) : 0;
-            drawCsBar(g, x, layout.apY, barW, barH, armorRatio, CSRenderUtil.CS_BLUE, "AP");
-            lastArmorValue = armor;
-        }
-
-        if (healthChanged) {
-            g.drawString(font, String.valueOf((int) health), x + barW + 4, layout.hpY, 0xFFFFFFFF);
-        }
-        if (armorChanged) {
+        if (armor != lastArmorValue) {
             g.drawString(font, String.valueOf(armor), x + barW + 4, layout.apY, 0xFFFFFFFF);
+            lastArmorValue = armor;
         }
     }
 
@@ -151,9 +134,6 @@ public class CSHudOverlay {
 
     private void drawMoney(GuiGraphics g, int w, int h, Layout layout) {
         int money = ClientState.getMoney();
-        if (money == lastMoney) return;
-        lastMoney = money;
-
         Font font = Minecraft.getInstance().font;
         String text = "$" + money;
         int padX = layout.scale(8);
@@ -162,18 +142,20 @@ public class CSHudOverlay {
         int textW = font.width(text);
         int boxX = w - textW - padX * 2 - layout.scale(8);
 
+        // Фон рисуем КАЖДЫЙ кадр (frame buffer очищается).
+        // Текст — только при изменении суммы.
         g.fill(boxX, boxY, boxX + textW + padX * 2, boxY + boxH, 0xCC000000);
         g.fill(boxX, boxY, boxX + 2, boxY + boxH, CSRenderUtil.CS_ORANGE);
-        g.drawString(font, text, boxX + padX, boxY + layout.scale(5), CSRenderUtil.CS_GREEN);
+
+        if (money != lastMoney) {
+            g.drawString(font, text, boxX + padX, boxY + layout.scale(5), CSRenderUtil.CS_GREEN);
+            lastMoney = money;
+        }
     }
 
     private void drawPhaseTimer(GuiGraphics g, int w, int h, Layout layout) {
         GamePhase phase = ClientState.getPhase();
         int ticks = ClientState.getPhaseTicks();
-        if (phase == lastPhase && ticks == lastPhaseTicks) return;
-        lastPhase = phase;
-        lastPhaseTicks = ticks;
-
         Font font = Minecraft.getInstance().font;
         String phaseName = switch (phase) {
             case LOBBY -> "ЛОББИ";
@@ -190,9 +172,19 @@ public class CSHudOverlay {
 
         int bgX1 = cx - textW / 2 - padX;
         int bgX2 = cx + textW / 2 + padX;
+
+        // Фон рисуем КАЖДЫЙ кадр (frame buffer очищается).
+        // Текст (фаза + секунды) — только при изменении значений.
         g.fill(bgX1, bgY1, bgX2, bgY2, 0xCC000000);
         g.fill(bgX1, bgY2 - 4, bgX2, bgY2 - 3, CSRenderUtil.CS_ORANGE);
-        g.drawString(font, text, cx - textW / 2, layout.scale(9), CSRenderUtil.CS_YELLOW);
+
+        if (phase != lastPhase || ticks != lastPhaseTicks) {
+            // Затираем старый текст перед рисованием нового (на случай изменения длины)
+            g.fill(bgX1 + 1, bgY1 + 1, bgX2 - 1, bgY2 - 5, 0xCC000000);
+            g.drawString(font, text, cx - textW / 2, layout.scale(9), CSRenderUtil.CS_YELLOW);
+            lastPhase = phase;
+            lastPhaseTicks = ticks;
+        }
     }
 
     /**
@@ -216,11 +208,11 @@ public class CSHudOverlay {
             ItemStack stack = p.getInventory().getItem(i);
             boolean isSelected = (i == selected);
 
-            // Фон слота — простой fill (без gradient — Tesselator дорогой)
+            // Фон слота — каждый кадр (frame buffer очищается)
             int bgColor = isSelected ? 0xEE3A2A1A : 0xEE0E0E0E;
             g.fill(hotbarX, slotY, hotbarX + slotSize, slotY + slotSize, bgColor);
 
-            // Рамка: выбранный — оранжевая outline, остальные — серая из 4 fill'ов
+            // Рамка — каждый кадр
             if (isSelected) {
                 g.renderOutline(hotbarX, slotY, slotSize, slotSize, CSRenderUtil.CS_ORANGE);
             } else {
@@ -231,33 +223,23 @@ public class CSHudOverlay {
                 g.fill(hotbarX + slotSize - 1, slotY, hotbarX + slotSize, slotY + slotSize, border);
             }
 
-            // Предмет — рисуем КАЖДЫЙ кадр (кэш renderItem сломан!)
+            // Предмет — каждый кадр, БЕЗ кэша
             if (!stack.isEmpty()) {
                 int itemX = hotbarX + (slotSize - 16) / 2;
                 int itemY = slotY + (slotSize - 16) / 2;
                 g.renderItem(stack, itemX, itemY);
             }
 
-            // Кэш количества — текст числа рисуем только при изменении
-            int currentCount = stack.getCount();
-            if (currentCount != lastItemCount[i]) {
-                // Очищаем старую цифру: рисуем чёрный квадрат под числом
-                if (lastItemCount[i] > 1) {
-                    int oldNumW = font.width(String.valueOf(lastItemCount[i]));
-                    g.fill(hotbarX + slotSize - oldNumW - 3, slotY + slotSize - 9,
-                           hotbarX + slotSize - 1, slotY + slotSize - 1, 0xEE0E0E0E);
-                }
-                if (currentCount > 1) {
-                    String count = String.valueOf(currentCount);
-                    g.drawString(font, count,
-                            hotbarX + slotSize - font.width(count) - 2,
-                            slotY + slotSize - 8,
-                            0xFFFFFFFF);
-                }
-                lastItemCount[i] = currentCount;
+            // Количество — каждый кадр, БЕЗ кэша (дёшево, string уже в Font кэше)
+            if (stack.getCount() > 1) {
+                String count = String.valueOf(stack.getCount());
+                g.drawString(font, count,
+                        hotbarX + slotSize - font.width(count) - 2,
+                        slotY + slotSize - 8,
+                        0xFFFFFFFF);
             }
 
-            // Номер слота слева — всегда (дёшево)
+            // Номер слота — каждый кадр
             String num = String.valueOf(i + 1);
             int numColor = isSelected ? CSRenderUtil.CS_ORANGE : 0xFF888888;
             g.drawString(font, num,
