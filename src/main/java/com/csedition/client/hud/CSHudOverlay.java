@@ -11,7 +11,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
-import net.minecraftforge.client.gui.overlay.NamedGuiOverlay;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 /**
@@ -20,12 +19,13 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
  * Хотбар — ВЕРТИКАЛЬНЫЙ, 3 слота, справа снизу (как мобильный FPS).
  *
  * Оптимизация FPS:
- *   1. Дедуп по фрейму (millis, не nanos — стабильнее на Windows).
- *   2. Кэш renderItem: рендерим ItemStack только если он изменился.
- *      g.renderItem — самая дорогая операция, особенно для TaCZ-моделей.
+ *   1. Рисуем только в Post одного конкретного overlay (minecraft:hotbar) —
+ *      это гарантирует ровно 1 draw/кадр без агрессивного millis-дедупа.
+ *   2. Кэш значений HP/AP/money/фазы — пропускаем fill и текст если не изменились.
  *   3. Используем fill вместо gradient где возможно (Tesselator дорогой).
- *   4. Кэш значений HP/AP/money/фазы — пропускаем fill и текст если не изменились.
- *   5. Никаких outline для не-выбранных слотов — только выбранный с рамкой.
+ *   4. Никаких outline для не-выбранных слотов — только выбранный с рамкой.
+ *   5. renderItem вызывается каждый кадр (кэш renderItem сломан: каждый кадр
+ *      frame buffer очищается, skip = предмет исчезает).
  */
 @OnlyIn(Dist.CLIENT)
 public class CSHudOverlay {
@@ -33,18 +33,15 @@ public class CSHudOverlay {
     private static final int HOTBAR_SLOTS = 3;
     private static final int SLOT_GAP = 4;
 
-    /** Дедуп по фрейму — millis стабильнее nanos на разных ОС. */
-    private long lastDrawMillis = -1;
-
-    /** Кэш ItemStack для renderItem — рендерим только при изменениях. */
-    private final ItemStack[] lastRenderedItem = new ItemStack[HOTBAR_SLOTS];
-
-    /** Кэш значений — пропускаем перерисовку если не изменились. */
+    /** Кэш значений — пропускаем перерисовку блоков если не изменились. */
     private float lastHealthRatio = -1f;
     private int lastArmorValue = -1;
     private int lastMoney = Integer.MIN_VALUE;
     private int lastPhaseTicks = Integer.MIN_VALUE;
     private GamePhase lastPhase = null;
+
+    /** Кэш количества предметов в слоте — пропускаем только текст числа. */
+    private final int[] lastItemCount = new int[HOTBAR_SLOTS];
 
     @SubscribeEvent
     public void onRenderOverlay(RenderGuiOverlayEvent.Pre event) {
@@ -66,16 +63,19 @@ public class CSHudOverlay {
         }
     }
 
+    /**
+     * Рисуем кастомный HUD ровно один раз за кадр — в Post-событии overlay'а
+     * minecraft:hotbar (последний из отменяемых). Это исключает дубль-рисование
+     * и проблему millis-дедупа (now == lastDrawMillis пропускал кадры целиком).
+     */
     @SubscribeEvent
     public void onRenderPost(RenderGuiOverlayEvent.Post event) {
         if (ClientState.getPhase() == GamePhase.LOBBY) return;
+        if (!"minecraft:hotbar".equals(event.getOverlay().id().toString())) return;
+
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
         if (mc.options.hideGui) return;
-
-        long now = System.currentTimeMillis();
-        if (now == lastDrawMillis) return;
-        lastDrawMillis = now;
 
         GuiGraphics g = event.getGuiGraphics();
         int w = mc.getWindow().getGuiScaledWidth();
@@ -184,7 +184,9 @@ public class CSHudOverlay {
 
     /**
      * ВЕРТИКАЛЬНЫЙ хотбар — 3 слота столбиком, справа снизу.
-     * renderItem с кэшем: ItemStack рисуется только если изменился.
+     * Фон, рамка и предмет рисуются КАЖДЫЙ кадр (кэш renderItem сломан —
+     * frame buffer очищается каждый кадр, skip = предмет исчезает).
+     * Кэшируем только текст количества, если оно не изменилось.
      */
     private void drawHotbar(GuiGraphics g, int w, int h, Player p, Layout layout) {
         Font font = Minecraft.getInstance().font;
@@ -216,22 +218,30 @@ public class CSHudOverlay {
                 g.fill(hotbarX + slotSize - 1, slotY, hotbarX + slotSize, slotY + slotSize, border);
             }
 
-            // КЭШ renderItem — рендерим только если ItemStack изменился
-            ItemStack lastStack = lastRenderedItem[i];
-            if (!ItemStack.matches(lastStack, stack)) {
-                if (!stack.isEmpty()) {
-                    int itemX = hotbarX + (slotSize - 16) / 2;
-                    int itemY = slotY + (slotSize - 16) / 2;
-                    g.renderItem(stack, itemX, itemY);
-                    if (stack.getCount() > 1) {
-                        String count = String.valueOf(stack.getCount());
-                        g.drawString(font, count,
-                                hotbarX + slotSize - font.width(count) - 2,
-                                slotY + slotSize - 8,
-                                0xFFFFFFFF);
-                    }
+            // Предмет — рисуем КАЖДЫЙ кадр (кэш renderItem сломан!)
+            if (!stack.isEmpty()) {
+                int itemX = hotbarX + (slotSize - 16) / 2;
+                int itemY = slotY + (slotSize - 16) / 2;
+                g.renderItem(stack, itemX, itemY);
+            }
+
+            // Кэш количества — текст числа рисуем только при изменении
+            int currentCount = stack.getCount();
+            if (currentCount != lastItemCount[i]) {
+                // Очищаем старую цифру: рисуем чёрный квадрат под числом
+                if (lastItemCount[i] > 1) {
+                    int oldNumW = font.width(String.valueOf(lastItemCount[i]));
+                    g.fill(hotbarX + slotSize - oldNumW - 3, slotY + slotSize - 9,
+                           hotbarX + slotSize - 1, slotY + slotSize - 1, 0xEE0E0E0E);
                 }
-                lastRenderedItem[i] = stack.copy();
+                if (currentCount > 1) {
+                    String count = String.valueOf(currentCount);
+                    g.drawString(font, count,
+                            hotbarX + slotSize - font.width(count) - 2,
+                            slotY + slotSize - 8,
+                            0xFFFFFFFF);
+                }
+                lastItemCount[i] = currentCount;
             }
 
             // Номер слота слева — всегда (дёшево)
