@@ -30,14 +30,15 @@ public class CSEditionMod {
         MinecraftForge.EVENT_BUS.register(MatchManager.getInstance());
         MinecraftForge.EVENT_BUS.register(new com.csedition.event.PlayerEvents());
         MinecraftForge.EVENT_BUS.register(new com.csedition.event.ServerEvents());
+        MinecraftForge.EVENT_BUS.register(new com.csedition.event.MatchEvents());
         MinecraftForge.EVENT_BUS.register(new com.csedition.command.CSCommand());
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON,
                 new net.minecraftforge.common.ForgeConfigSpec.Builder().build(),
                 "csedition-common.toml");
 
-        // MapConfig.load() вызывается в ServerEvents.onServerStarted,
-        // когда мир уже доступен (нужен путь к папке мира)
+        // MapConfig.load() РІС‹Р·С‹РІР°РµС‚СЃСЏ РІ ServerEvents.onServerStarted,
+        // РєРѕРіРґР° РјРёСЂ СѓР¶Рµ РґРѕСЃС‚СѓРїРµРЅ (РЅСѓР¶РµРЅ РїСѓС‚СЊ Рє РїР°РїРєРµ РјРёСЂР°)
         LOGGER.info("[CS-Edition] Mod initialized.");
     }
 
