@@ -5,12 +5,12 @@ import com.csedition.client.render.CSRenderUtil;
 import com.csedition.match.GunPriceTable;
 import com.csedition.network.CSPackets;
 import com.csedition.network.PacketBuyGun;
+import com.csedition.tacz.TaczHelper;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +21,9 @@ import java.util.Map;
  * Стиль CS: тёмные панели, оранжевые акценты, угловые элементы.
  * Оружие разделено по категориям (Pistols, SMGs, Rifles, Snipers, Heavy, Utility).
  * Всё процедурно — никаких PNG.
+ *
+ * Иконки оружия берутся через TaczHelper.createGun() — это гарантирует что
+ * предмет рендерится с правильной текстурой (TaCZ определяет оружие по NBT GunId).
  */
 public class BuyMenuScreen extends Screen {
     private static final int SLOT = 40;
@@ -30,6 +33,9 @@ public class BuyMenuScreen extends Screen {
     // Категории для отображения
     private static final String[] CATEGORIES = {"pistol", "smg", "rifle", "sniper", "heavy", "utility"};
     private static final String[] CATEGORY_NAMES = {"ПИСТОЛЕТЫ", "ПП", "АВТОМАТЫ", "СНАЙПЕРКИ", "ТЯЖЁЛОЕ", "СНАРЯЖЕНИЕ"};
+
+    // Скролл
+    private int scrollOffset = 0;
 
     public BuyMenuScreen() {
         super(Component.literal("Меню закупа"));
@@ -43,21 +49,30 @@ public class BuyMenuScreen extends Screen {
 
         // Заголовок в панели
         String title = "МЕНЮ ЗАКУПА  $" + ClientState.getMoney();
-        int titleW = this.font.width(title) + 24;
-        CSRenderUtil.csPanel(g, this.width / 2 - titleW / 2, 8, titleW, 26, null, this.font);
+        Font font = this.font;
+        int titleW = font.width(title) + 24;
+        CSRenderUtil.csPanel(g, this.width / 2 - titleW / 2, 8, titleW, 26, null, font);
         CSRenderUtil.cornerAccents(g, this.width / 2 - titleW / 2, 8, titleW, 26, 6, CSRenderUtil.CS_ORANGE);
-        g.drawCenteredString(this.font, title, this.width / 2, 16, CSRenderUtil.CS_ORANGE);
+        g.drawCenteredString(font, title, this.width / 2, 16, CSRenderUtil.CS_ORANGE);
+
+        // Сколько предметов в каждой категории — для расчёта ширины строки
+        int maxRowWidth = 0;
+        for (String cat : CATEGORIES) {
+            int n = getItemsInCategory(cat).size();
+            int w = n * (SLOT + PADDING);
+            if (w > maxRowWidth) maxRowWidth = w;
+        }
 
         // Рисуем категории
-        int catY = 50;
+        int catY = 50 - scrollOffset;
         for (int catIdx = 0; catIdx < CATEGORIES.length; catIdx++) {
             String cat = CATEGORIES[catIdx];
             String catName = CATEGORY_NAMES[catIdx];
 
             // Заголовок категории
-            int nameW = this.font.width(catName) + 12;
-            CSRenderUtil.csPanel(g, 12, catY, nameW, 16, null, this.font);
-            g.drawString(this.font, catName, 18, catY + 4, CSRenderUtil.CS_YELLOW);
+            int nameW = font.width(catName) + 12;
+            CSRenderUtil.csPanel(g, 12, catY, nameW, 16, null, font);
+            g.drawString(font, catName, 18, catY + 4, CSRenderUtil.CS_YELLOW);
 
             // Слоты оружия в этой категории
             List<Map.Entry<String, Integer>> items = getItemsInCategory(cat);
@@ -73,9 +88,9 @@ public class BuyMenuScreen extends Screen {
                         && mouseY >= slotY && mouseY <= slotY + SLOT;
 
                 // Кнопка-слот
-                CSRenderUtil.csButton(g, slotX, slotY, SLOT, SLOT, "", hovered, this.font);
+                CSRenderUtil.csButton(g, slotX, slotY, SLOT, SLOT, "", hovered, font);
 
-                // Иконка предмета (центрирована)
+                // Иконка предмета (центрирована) — через TaczHelper, чтобы был правильный рендер TaCZ
                 ItemStack stack = getItemStack(gunId);
                 if (!stack.isEmpty()) {
                     int iconX = slotX + (SLOT - 16) / 2;
@@ -86,8 +101,8 @@ public class BuyMenuScreen extends Screen {
                 // Цена внизу
                 String priceStr = "$" + price;
                 int priceColor = canAfford ? CSRenderUtil.CS_GREEN : CSRenderUtil.CS_RED;
-                int priceW = this.font.width(priceStr);
-                g.drawString(this.font, priceStr, slotX + (SLOT - priceW) / 2, slotY + SLOT - 10, priceColor);
+                int priceW = font.width(priceStr);
+                g.drawString(font, priceStr, slotX + (SLOT - priceW) / 2, slotY + SLOT - 10, priceColor);
 
                 slotX += SLOT + PADDING;
             }
@@ -96,28 +111,31 @@ public class BuyMenuScreen extends Screen {
         }
 
         // Подсказка
-        g.drawCenteredString(this.font, "ESC — закрыть  |  Z=последнее  X=автомат  C=пистолет  4=снаряжение",
+        g.drawCenteredString(font, "ESC — закрыть  |  Z=последнее  X=автомат  C=пистолет  4=снаряжение",
                 this.width / 2, this.height - 16, 0xFF888888);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int catY = 50;
-        for (int catIdx = 0; catIdx < CATEGORIES.length; catIdx++) {
-            String cat = CATEGORIES[catIdx];
+        if (button != 0) return super.mouseClicked(mouseX, mouseY, button);
+        int catY = 50 - scrollOffset;
+        for (String cat : CATEGORIES) {
             List<Map.Entry<String, Integer>> items = getItemsInCategory(cat);
             int slotX = 12;
             int slotY = catY + 22;
 
-            for (int i = 0; i < items.size(); i++) {
-                Map.Entry<String, Integer> entry = items.get(i);
+            for (Map.Entry<String, Integer> entry : items) {
+                String gunId = entry.getKey();
+                int price = entry.getValue();
                 if (mouseX >= slotX && mouseX <= slotX + SLOT
                         && mouseY >= slotY && mouseY <= slotY + SLOT) {
-                    String gunId = entry.getKey();
-                    int price = entry.getValue();
                     if (ClientState.getMoney() >= price) {
                         CSPackets.CHANNEL.sendToServer(new PacketBuyGun(gunId));
                         this.onClose();
+                    } else {
+                        // Маленький визуальный отклик — даже без покупки
+                        this.minecraft.player.displayClientMessage(
+                                Component.literal("§cНедостаточно денег: $" + price), true);
                     }
                     return true;
                 }
@@ -126,6 +144,18 @@ public class BuyMenuScreen extends Screen {
             catY += SLOT + 30;
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        int totalH = CATEGORIES.length * (SLOT + 30);
+        int availableH = this.height - 80;
+        int maxScroll = Math.max(0, totalH - availableH);
+        int step = (SLOT + 30) / 2;
+        int old = scrollOffset;
+        if (delta > 0) scrollOffset = Math.max(0, scrollOffset - step);
+        else if (delta < 0) scrollOffset = Math.min(maxScroll, scrollOffset + step);
+        return old != scrollOffset;
     }
 
     private List<Map.Entry<String, Integer>> getItemsInCategory(String category) {
@@ -138,12 +168,15 @@ public class BuyMenuScreen extends Screen {
         return result;
     }
 
+    /**
+     * Создаёт ItemStack оружия для отображения иконки.
+     * Используем TaczHelper.createGun — он возвращает предмет с правильным
+     * base item (tacz:modern_kinetic_gun) и NBT GunId, по которому TaCZ
+     * выбирает модель и текстуру.
+     */
     private ItemStack getItemStack(String gunId) {
-        try {
-            var item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(gunId));
-            if (item != null) return new ItemStack(item);
-        } catch (Exception ignored) {}
-        return ItemStack.EMPTY;
+        ItemStack stack = TaczHelper.createGun(gunId);
+        return stack.isEmpty() ? ItemStack.EMPTY : stack;
     }
 
     @Override

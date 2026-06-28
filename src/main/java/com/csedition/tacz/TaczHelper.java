@@ -301,4 +301,20 @@ public final class TaczHelper {
         inv.setItem(slot, stack);
         return true;
     }
+
+    /**
+     * Нормализует id оружия: если не указано пространство имён,
+     * добавляет префикс "tacz:".
+     *   "ak47"        -> "tacz:ak47"
+     *   "tacz:ak47"   -> "tacz:ak47"
+     *   "tacz:"       -> "tacz:"
+     *   null/empty    -> null/empty
+     */
+    public static String normalizeGunId(String input) {
+        if (input == null) return null;
+        String s = input.trim();
+        if (s.isEmpty()) return s;
+        if (s.contains(":")) return s;
+        return "tacz:" + s;
+    }
 }

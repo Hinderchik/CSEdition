@@ -510,13 +510,15 @@ public class CSCommand {
 
     /**
      * Тестовая покупка: вызывает реальный handleBuyRequest (с проверкой денег, зоны, фазы).
+     * Принимает короткие id ("ak47") — автоматически префиксирует "tacz:".
      */
     private int testBuy(CommandContext<CommandSourceStack> ctx, String gunId) {
         try {
             ServerPlayer p = ctx.getSource().getPlayerOrException();
+            gunId = com.csedition.tacz.TaczHelper.normalizeGunId(gunId);
             int price = GunPriceTable.getPrice(gunId);
             if (price < 0) {
-                p.sendSystemMessage(Component.literal("§cUnknown weapon: " + gunId));
+                p.sendSystemMessage(Component.literal("§cUnknown weapon: " + gunId + " (use /cs test guns for list)"));
                 return 0;
             }
             p.sendSystemMessage(Component.literal("§eAttempting to buy " + gunId + " ($" + price + ")..."));
@@ -530,10 +532,12 @@ public class CSCommand {
 
     /**
      * Тестовая выдача: выдаёт оружие бесплатно, без проверок.
+     * Принимает короткие id ("ak47") — автоматически префиксирует "tacz:".
      */
     private int testGive(CommandContext<CommandSourceStack> ctx, String gunId) {
         try {
             ServerPlayer p = ctx.getSource().getPlayerOrException();
+            gunId = com.csedition.tacz.TaczHelper.normalizeGunId(gunId);
             com.csedition.tacz.TaczHelper.giveGun(p, gunId);
             p.sendSystemMessage(Component.literal("§aGiven: " + gunId));
             return 1;
