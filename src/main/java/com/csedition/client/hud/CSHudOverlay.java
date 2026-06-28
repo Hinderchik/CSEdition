@@ -16,45 +16,35 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 /**
  * Кастомный HUD в стиле CS.
- * Оптимизирован для максимального FPS:
- *   - Кэширование значений (не пересчитываем каждый кадр)
- *   - Пропуск отрисовки при отсутствии изменений
- *   - Минимум аллокаций в горячем пути
- *   - Прямые вызовы fill() вместо сложных утилит
  *
- * В лобби (LOBBY) показывается стандартный ванильный HUD (сердечки, голод, хотбар).
+ * В лобби (LOBBY) — стандартный ванильный HUD (хотбар, сердечки, голод).
  * В катке (BUY_TIME / FIGHTING / ROUND_END) — кастомный CS HUD.
+ *
+ * Хотбар НЕ отменяется — оставляем ванильный чтобы игрок видел свои предметы.
+ * Кастомный HUD рисуется поверх.
+ *
+ * ВАЖНО: все элементы рисуются КАЖДЫЙ кадр без кэш-чеков.
+ * Раньше были ранние return'ы по cache — это вызывало мерцание текста
+ * (текст рисовался, потом не рисовался, потом снова появлялся).
+ * Стоимость перерисовки мизерная: пара строк и rect'ов.
  */
 @OnlyIn(Dist.CLIENT)
 public class CSHudOverlay {
 
-    // Кэш для пропуска отрисовки при отсутствии изменений
-    private int cachedMoney = Integer.MIN_VALUE;
-    private int cachedPhase = Integer.MIN_VALUE;
-    private int cachedPhaseTicks = Integer.MIN_VALUE;
-    private float cachedHealth = -1f;
-    private int cachedArmor = -1;
-    private int cachedAmmoIn = -1;
-    private int cachedAmmoRes = -1;
-    private int cachedW = -1, cachedH = -1;
-
-    // Номер последнего кадра, в котором мы рисовали HUD
-    private long lastRenderFrame = -1;
-
     @SubscribeEvent
     public void onRenderOverlay(RenderGuiOverlayEvent.Pre event) {
-        // В лобби — НЕ отключаем ванильные оверлеи (показываем стандартный HUD)
+        // В лобби — НЕ отменяем ванильные оверлеи
         if (ClientState.getPhase() == GamePhase.LOBBY) return;
 
+        // В катке отменяем ТОЛЬКО health/armor/hunger, чтобы нарисовать свои.
+        // Хотбар НЕ отменяем — игрок должен видеть выданное оружие.
         NamedGuiOverlay overlay = event.getOverlay();
         String id = overlay.id().toString();
-        // В катке — отключаем стандартные оверлеи, рисуем свои
         switch (id) {
             case "minecraft:player_health":
             case "minecraft:food_level":
             case "minecraft:air_level":
             case "minecraft:armor_level":
-            case "minecraft:hotbar":
             case "minecraft:experience_bar":
             case "minecraft:jump_bar":
             case "minecraft:mount_health":
@@ -67,15 +57,10 @@ public class CSHudOverlay {
 
     @SubscribeEvent
     public void onRenderPost(RenderGuiOverlayEvent.Post event) {
-        // В лобби — не рисуем кастомный HUD (используется ванильный)
+        // В лобби — не рисуем кастомный HUD
         if (ClientState.getPhase() == GamePhase.LOBBY) return;
 
-        // Рисуем HUD только один раз за кадр.
         Minecraft mc = Minecraft.getInstance();
-        long frameId = System.nanoTime() / 16_666_666L;
-        if (frameId == lastRenderFrame) return;
-        lastRenderFrame = frameId;
-
         if (mc.player == null || mc.level == null) return;
         if (mc.options.hideGui) return;
 
@@ -83,18 +68,7 @@ public class CSHudOverlay {
         int w = mc.getWindow().getGuiScaledWidth();
         int h = mc.getWindow().getGuiScaledHeight();
 
-        // Если размер окна изменился — сбрасываем кэш
-        if (w != cachedW || h != cachedH) {
-            cachedW = w; cachedH = h;
-            cachedMoney = Integer.MIN_VALUE;
-            cachedPhase = Integer.MIN_VALUE;
-            cachedPhaseTicks = Integer.MIN_VALUE;
-            cachedHealth = -1f;
-            cachedArmor = -1;
-            cachedAmmoIn = -1;
-            cachedAmmoRes = -1;
-        }
-
+        // Всё рисуем каждый кадр — никаких кэшей
         drawHealthArmor(g, w, h, mc.player);
         drawMoney(g, w, h);
         drawAmmo(g, w, h, mc.player);
@@ -104,9 +78,7 @@ public class CSHudOverlay {
 
     private void drawRoundEndScreen(GuiGraphics g, int w, int h) {
         if (!ClientState.shouldShowRoundEnd()) return;
-        // Затемнение фона
         g.fill(0, 0, w, h, 0x80000000);
-        // Заголовок
         Font font = Minecraft.getInstance().font;
         String winner = ClientState.getRoundEndWinner();
         String reason = ClientState.getRoundEndReason();
@@ -140,27 +112,20 @@ public class CSHudOverlay {
     }
 
     private void drawHealthArmor(GuiGraphics g, int w, int h, Player p) {
-        float health = p.getHealth();
-        int armor = p.getArmorValue();
-
-        // Пропуск если ничего не изменилось
-        if (health == cachedHealth && armor == cachedArmor) return;
-        cachedHealth = health;
-        cachedArmor = armor;
-
         int barWidth = 160;
         int barHeight = 8;
         int x = 12;
         int y = h - 36;
 
         float maxHp = p.getMaxHealth();
-        float healthRatio = maxHp > 0 ? Math.max(0, health / maxHp) : 0;
+        float healthRatio = maxHp > 0 ? Math.max(0, p.getHealth() / maxHp) : 0;
         CSRenderUtil.healthBar(g, x, y, barWidth, barHeight, healthRatio, CSRenderUtil.CS_RED);
 
         Font font = Minecraft.getInstance().font;
-        g.drawString(font, String.valueOf((int) health), x + barWidth + 4, y, 0xFFFFFFFF);
+        g.drawString(font, String.valueOf((int) p.getHealth()), x + barWidth + 4, y, 0xFFFFFFFF);
 
         int y2 = y + barHeight + 3;
+        int armor = p.getArmorValue();
         float armorRatio = armor > 0 ? Math.min(1f, armor / 20f) : 0;
         CSRenderUtil.healthBar(g, x, y2, barWidth, barHeight, armorRatio, CSRenderUtil.CS_BLUE);
         g.drawString(font, String.valueOf(armor), x + barWidth + 4, y2, 0xFFFFFFFF);
@@ -168,9 +133,6 @@ public class CSHudOverlay {
 
     private void drawMoney(GuiGraphics g, int w, int h) {
         int money = ClientState.getMoney();
-        if (money == cachedMoney) return;
-        cachedMoney = money;
-
         Font font = Minecraft.getInstance().font;
         String text = "$" + money;
         int x = w - font.width(text) - 12;
@@ -187,10 +149,6 @@ public class CSHudOverlay {
                 ammoRes = tag.getInt("AmmoCountMax");
             }
         }
-        if (ammoIn == cachedAmmoIn && ammoRes == cachedAmmoRes) return;
-        cachedAmmoIn = ammoIn;
-        cachedAmmoRes = ammoRes;
-
         Font font = Minecraft.getInstance().font;
         String ammo = ammoIn + " / " + ammoRes;
         int x = w - font.width(ammo) - 12;
@@ -198,21 +156,31 @@ public class CSHudOverlay {
     }
 
     private void drawPhaseTimer(GuiGraphics g, int w, int h) {
-        int phase = ClientState.getPhase().ordinal();
+        GamePhase phase = ClientState.getPhase();
         int ticks = ClientState.getPhaseTicks();
-        if (phase == cachedPhase && ticks == cachedPhaseTicks) return;
-        cachedPhase = phase;
-        cachedPhaseTicks = ticks;
 
         Font font = Minecraft.getInstance().font;
-        String phaseName = switch (ClientState.getPhase()) {
+        String phaseName = switch (phase) {
             case LOBBY -> "ЛОББИ";
             case BUY_TIME -> "ЗАКУП";
             case FIGHTING -> "БОЙ";
             case ROUND_END -> "КОНЕЦ РАУНДА";
         };
         String text = phaseName + "  " + (ticks / 20) + "с";
-        int x = w / 2 - font.width(text) / 2;
-        g.drawString(font, text, x, 8, CSRenderUtil.CS_YELLOW);
+        int textW = font.width(text);
+        int cx = w / 2;
+
+        // Тёмный фон чтобы текст всегда читался (и не мерцал при перекрытии оверлеями)
+        int bgX1 = cx - textW / 2 - 8;
+        int bgX2 = cx + textW / 2 + 8;
+        g.fill(bgX1, 4, bgX2, 22, 0xCC000000);
+        g.fill(bgX1, 18, bgX2, 19, CSRenderUtil.CS_ORANGE);
+        // Угловые акценты
+        g.fill(bgX1, 4, bgX1 + 6, 5, CSRenderUtil.CS_ORANGE);
+        g.fill(bgX1, 4, bgX1 + 1, 10, CSRenderUtil.CS_ORANGE);
+        g.fill(bgX2 - 6, 4, bgX2, 5, CSRenderUtil.CS_ORANGE);
+        g.fill(bgX2 - 1, 4, bgX2, 10, CSRenderUtil.CS_ORANGE);
+
+        g.drawString(font, text, cx - textW / 2, 9, CSRenderUtil.CS_YELLOW);
     }
 }

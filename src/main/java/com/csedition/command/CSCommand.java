@@ -155,7 +155,10 @@ public class CSCommand {
                                         .executes(ctx -> testBuy(ctx, StringArgumentType.getString(ctx, "gunId")))))
                         .then(Commands.literal("give")
                                 .then(Commands.argument("gunId", StringArgumentType.string())
-                                        .executes(ctx -> testGive(ctx, StringArgumentType.getString(ctx, "gunId"))))))
+                                        .executes(ctx -> testGive(ctx, StringArgumentType.getString(ctx, "gunId")))))
+                        .then(Commands.literal("setbuyzone")
+                                .then(Commands.argument("team", StringArgumentType.string())
+                                        .executes(ctx -> testSetBuyZone(ctx, StringArgumentType.getString(ctx, "team"))))))
                 // === Конфиг ===
                 .then(Commands.literal("config")
                         .then(Commands.literal("slots")
@@ -204,6 +207,9 @@ public class CSCommand {
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs test phase <LOBBY|BUY_TIME|FIGHTING|ROUND_END>§7"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs test team <T|CT>§7"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs test spawn§7 — телепорт на спавн"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs test setbuyzone <T|CT>§7 — зона покупки вокруг вас"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs test buy <gunId>§7 — купить (с проверкой)"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs test give <gunId>§7 — выдать бесплатно"));
         ctx.getSource().sendSystemMessage(Component.literal("§7Файл карт: §f" + MapConfig.getCurrentFile()));
         ctx.getSource().sendSystemMessage(Component.literal("§7Файл режимов: §f" + ModeConfig.getCurrentFile()));
         return 1;
@@ -533,6 +539,43 @@ public class CSCommand {
             return 1;
         } catch (Exception e) {
             ctx.getSource().sendSystemMessage(Component.literal("§cFailed: " + e.getMessage()));
+            return 0;
+        }
+    }
+
+    /**
+     * Тестовая установка зоны закупа вокруг игрока (одна команда).
+     * Создаёт зону ±8 блоков по XZ вокруг текущей позиции.
+     * Y автоматически ставится от -60 до 222 (полная высота).
+     * Удобно для тестирования покупки: встал, прописал — и можно покупать.
+     */
+    private int testSetBuyZone(CommandContext<CommandSourceStack> ctx, String teamStr) {
+        try {
+            ServerPlayer p = ctx.getSource().getPlayerOrException();
+            Team team = parseTeam(teamStr);
+            if (team == null) {
+                p.sendSystemMessage(Component.literal("§cTeam must be T or CT"));
+                return 0;
+            }
+            MatchManager mm = MatchManager.getInstance();
+            MapData map = mm.getCurrentMap();
+            if (map == null) {
+                p.sendSystemMessage(Component.literal("§cNo map selected. Use /cs start <mapId> first."));
+                return 0;
+            }
+            BlockPos playerPos = p.blockPosition();
+            int radius = 8;
+            // Y заполнится автоматически в MapConfig.setBuyZone (от -60 до 222)
+            BlockPos min = playerPos.offset(-radius, 0, -radius);
+            BlockPos max = playerPos.offset(radius, 0, radius);
+            MapConfig.setBuyZone(map.getId(), team, min, max);
+            broadcastMaps();
+            p.sendSystemMessage(Component.literal("§aBuy zone for §e" + team + " §aset around you §7("
+                    + (radius * 2 + 1) + "x" + (radius * 2 + 1) + " XZ, full Y)"));
+            p.sendSystemMessage(Component.literal("§7You can now buy weapons here. Use /cs test buy <gunId>."));
+            return 1;
+        } catch (Exception e) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cThis command must be run as a player: " + e.getMessage()));
             return 0;
         }
     }

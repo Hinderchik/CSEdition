@@ -487,22 +487,30 @@ public class MatchManager {
     }
 
     private void giveBaseLoadout(ServerPlayer player, PlayerData pd, GameMode mode) {
-        // Очищаем инвентарь только если это первый раунд или если включена очистка
-        // По новой логике — инвентарь НЕ очищается между раундами, только после матча
-        // Но при старте нового матча — очищаем
+        // Очищаем инвентарь только в первом раунде.
+        // Между раундами инвентарь сохраняется (покупки остаются).
         if (roundNumber == 1) {
             clearInventoryKeeping(player);
         }
         List<String> weapons = mode.getStartWeapons(pd.getTeam());
         if (weapons == null || weapons.isEmpty()) {
-            player.getInventory().add(TaczHelper.createPistol(pd.getTeam() == Team.T));
-            player.getInventory().add(TaczHelper.createKnife());
+            // Дефолт: пистолет + нож в хотбар
+            TaczHelper.giveGunToSlot(player, pd.getTeam() == Team.T ? "tacz:glock_17" : "tacz:usp_45", 0);
+            TaczHelper.giveGunToSlot(player, "tacz:combat_knife", 1);
             return;
         }
+        // Кладём стартовое оружие в слоты хотбара по порядку: 0, 1, 2...
+        // Если оружий больше чем 3 — лишнее уходит в основной инвентарь.
+        int hotbarSlot = 0;
         for (String gunId : weapons) {
-            ItemStack gun = TaczHelper.createGun(gunId);
-            if (!gun.isEmpty()) {
-                player.getInventory().add(gun);
+            if (hotbarSlot <= 8) {
+                if (TaczHelper.giveGunToSlot(player, gunId, hotbarSlot)) {
+                    hotbarSlot++;
+                } else {
+                    TaczHelper.giveGun(player, gunId);
+                }
+            } else {
+                TaczHelper.giveGun(player, gunId);
             }
         }
     }
