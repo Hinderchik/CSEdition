@@ -141,13 +141,14 @@ public final class TaczHelper {
             for (String fieldName : new String[]{"INSTANCE", "instance", "ITEM"}) {
                 try {
                     Field f = GUN_ITEM_CLASS.getDeclaredField(fieldName);
+                    f.setAccessible(true);
                     Object instance = f.get(null);
                     if (instance instanceof Item item) {
                         cachedGunItem = item;
                         CSEditionMod.LOGGER.info("[CS-Edition] TaCZ gun-item resolved via field {}", fieldName);
                         return cachedGunItem;
                     }
-                } catch (NoSuchFieldException ignored) {}
+                } catch (NoSuchFieldException | IllegalAccessException ignored) {}
             }
         }
         CSEditionMod.LOGGER.warn("[CS-Edition] TaCZ base gun-item not resolved - guns will not work");
