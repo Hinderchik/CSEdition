@@ -64,12 +64,15 @@ public class CSHudOverlay {
     }
 
     /**
-     * Публичный метод рендера HUD — вызывается из кастомного overlay,
-     * зарегистрированного через RegisterGuiOverlaysEvent.
-     * Гарантирует ровно 1 вызов/кадр (Forge сам управляет порядком overlay'ов).
+     * Public render method called by the custom overlay
+     * (registered via RegisterGuiOverlaysEvent) AND by the Post
+     * event handler below. Both paths call this method.
      *
-     * Раньше рисовали в Post minecraft:hotbar, но при отмене Pre Post не
-     * стреляет — overlay целиком пропускается. Кастомный overlay решает это.
+     * Previously we drew in Post of minecraft:hotbar, but canceling
+     * Pre in some Forge versions prevents Post from firing.
+     * Solution: draw in Post of minecraft:crosshair (which we never
+     * cancel) — Post always fires regardless of Pre, so our HUD
+     * renders on top every frame.
      */
     public void render(GuiGraphics g) {
         if (ClientState.getPhase() == GamePhase.LOBBY) return;
@@ -85,6 +88,17 @@ public class CSHudOverlay {
         drawMoney(g, w, h, layout);
         drawPhaseTimer(g, w, h, layout);
         drawHotbar(g, w, h, mc.player, layout);
+    }
+
+    /**
+     * Fallback render path — fires every frame in Post of minecraft:crosshair.
+     * This overlay is never canceled, so Post always fires.
+     * Our HUD draws on top of the crosshair.
+     */
+    @SubscribeEvent
+    public void onRenderCrosshairPost(RenderGuiOverlayEvent.Post event) {
+        if (!"minecraft:crosshair".equals(event.getOverlay().id().toString())) return;
+        render(event.getGuiGraphics());
     }
 
     private void drawHealthArmor(GuiGraphics g, int w, int h, Player p, Layout layout) {

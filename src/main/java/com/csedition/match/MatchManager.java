@@ -149,10 +149,21 @@ public class MatchManager {
             lastBroadcastMap = currentMapId;
             lastBroadcastMode = currentModeId;
         }
-        for (UUID uuid : playerDataMap.keySet()) {
-            ServerPlayer sp = getServerPlayer(uuid);
-            if (sp != null) {
+        // Send to ALL connected players, not just those in playerDataMap.
+        // If a player hasn't been registered yet (e.g. just joined),
+        // they still need the current phase so ClientState updates and HUD shows.
+        var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        if (server != null) {
+            for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
                 CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), cachedPhasePacket);
+            }
+        } else {
+            // Fallback: only registered players
+            for (UUID uuid : playerDataMap.keySet()) {
+                ServerPlayer sp = getServerPlayer(uuid);
+                if (sp != null) {
+                    CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), cachedPhasePacket);
+                }
             }
         }
     }
