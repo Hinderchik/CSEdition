@@ -51,89 +51,83 @@ public final class TaczHelper {
     };
 
     /**
-     * Размеры магазинов для известных пушек (по умолчанию если нет в gun data).
+     * Размеры магазинов для пушек, которые реально используются в проекте.
+     * Используется в NBT-fallback и в /give команде как GunCurrentAmmoCount.
+     *
+     * Если пушки нет в этой карте — используется дефолт 30.
+     * Чтобы добавить новую пушку — просто пропиши её здесь.
      */
     private static final Map<String, Integer> MAGAZINE_SIZES = new HashMap<>();
     static {
         // Пистолеты
         MAGAZINE_SIZES.put("tacz:glock_17", 17);
-        MAGAZINE_SIZES.put("tacz:usp_45", 12);
-        MAGAZINE_SIZES.put("tacz:p226", 15);
+        MAGAZINE_SIZES.put("mcs2:cs_usp", 12);
         MAGAZINE_SIZES.put("tacz:p320", 17);
-        MAGAZINE_SIZES.put("tacz:m1911", 7);
         MAGAZINE_SIZES.put("tacz:deagle", 7);
         MAGAZINE_SIZES.put("tacz:cz75", 16);
-        MAGAZINE_SIZES.put("tacz:hk45", 8);
         // SMG
-        MAGAZINE_SIZES.put("tacz:mp5", 30);
-        MAGAZINE_SIZES.put("tacz:mp7", 30);
-        MAGAZINE_SIZES.put("tacz:mp9", 30);
+        MAGAZINE_SIZES.put("tacz:hk_mp5a5", 30);
+        MAGAZINE_SIZES.put("tacz:ump45", 30);
         MAGAZINE_SIZES.put("tacz:p90", 50);
         MAGAZINE_SIZES.put("tacz:uzi", 32);
-        MAGAZINE_SIZES.put("tacz:vector", 25);
         // Винтовки
         MAGAZINE_SIZES.put("tacz:ak47", 30);
         MAGAZINE_SIZES.put("tacz:m4a1", 30);
-        MAGAZINE_SIZES.put("tacz:m4a4", 30);
-        MAGAZINE_SIZES.put("tacz:hk416", 30);
-        MAGAZINE_SIZES.put("tacz:ar15", 30);
+        MAGAZINE_SIZES.put("tacz:fn_fal", 30);
+        MAGAZINE_SIZES.put("tacz:hk416d", 30);
+        MAGAZINE_SIZES.put("tacz:qbz_95", 30);
         MAGAZINE_SIZES.put("tacz:aug", 30);
-        MAGAZINE_SIZES.put("tacz:sg556", 30);
         MAGAZINE_SIZES.put("tacz:scar_l", 30);
+        MAGAZINE_SIZES.put("tacz:scar_h", 30);
         // Снайперские
-        MAGAZINE_SIZES.put("tacz:awp", 5);
-        MAGAZINE_SIZES.put("tacz:m24", 5);
-        MAGAZINE_SIZES.put("tacz:scar_20", 10);
+        MAGAZINE_SIZES.put("tacz:ai_awp", 5);
+        MAGAZINE_SIZES.put("mcs2:cs_awp", 5);
         MAGAZINE_SIZES.put("tacz:m700", 5);
         // Дробовики
         MAGAZINE_SIZES.put("tacz:m870", 5);
-        MAGAZINE_SIZES.put("tacz:m1014", 6);
+        MAGAZINE_SIZES.put("tacz:spas_12", 6);
         // LMG
         MAGAZINE_SIZES.put("tacz:m249", 100);
-        MAGAZINE_SIZES.put("tacz:rpk", 75);
+        MAGAZINE_SIZES.put("tacz:fn_evolys", 75);
     }
 
     /**
-     * Fire mode по умолчанию для каждой пушки (если gun data не указывает иначе).
+     * Fire mode по умолчанию для каждой пушки.
      * "SEMI" = полуавтомат, "AUTO" = автомат, "BURST" = очередь.
+     * Если пушки нет — дефолт "SEMI".
      */
     private static final Map<String, String> DEFAULT_FIRE_MODES = new HashMap<>();
     static {
+        // Пистолеты — все SEMI
         DEFAULT_FIRE_MODES.put("tacz:glock_17", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:usp_45", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:p250", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:desert_eagle", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:p226", "SEMI");
+        DEFAULT_FIRE_MODES.put("mcs2:cs_usp", "SEMI");
         DEFAULT_FIRE_MODES.put("tacz:p320", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:m1911", "SEMI");
+        DEFAULT_FIRE_MODES.put("tacz:deagle", "SEMI");
         DEFAULT_FIRE_MODES.put("tacz:cz75", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:hk45", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:mp5", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:mp7", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:mp9", "AUTO");
+        // SMG — все AUTO
+        DEFAULT_FIRE_MODES.put("tacz:hk_mp5a5", "AUTO");
+        DEFAULT_FIRE_MODES.put("tacz:ump45", "AUTO");
         DEFAULT_FIRE_MODES.put("tacz:p90", "AUTO");
         DEFAULT_FIRE_MODES.put("tacz:uzi", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:vector", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:ump_45", "AUTO");
+        // Винтовки — все AUTO
         DEFAULT_FIRE_MODES.put("tacz:ak47", "AUTO");
         DEFAULT_FIRE_MODES.put("tacz:m4a1", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:m4a4", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:hk416", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:ar15", "AUTO");
+        DEFAULT_FIRE_MODES.put("tacz:fn_fal", "AUTO");
+        DEFAULT_FIRE_MODES.put("tacz:hk416d", "AUTO");
+        DEFAULT_FIRE_MODES.put("tacz:qbz_95", "AUTO");
         DEFAULT_FIRE_MODES.put("tacz:aug", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:sg556", "AUTO");
         DEFAULT_FIRE_MODES.put("tacz:scar_l", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:awp", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:m24", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:scar_20", "SEMI");
+        DEFAULT_FIRE_MODES.put("tacz:scar_h", "AUTO");
+        // Снайперские — все SEMI
+        DEFAULT_FIRE_MODES.put("tacz:ai_awp", "SEMI");
+        DEFAULT_FIRE_MODES.put("mcs2:cs_awp", "SEMI");
         DEFAULT_FIRE_MODES.put("tacz:m700", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:scout", "SEMI");
+        // Дробовики — все SEMI
         DEFAULT_FIRE_MODES.put("tacz:m870", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:m1014", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:nova", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:xm1014", "SEMI");
+        DEFAULT_FIRE_MODES.put("tacz:spas_12", "SEMI");
+        // LMG — все AUTO
         DEFAULT_FIRE_MODES.put("tacz:m249", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:rpk", "AUTO");
+        DEFAULT_FIRE_MODES.put("tacz:fn_evolys", "AUTO");
     }
 
     /**
