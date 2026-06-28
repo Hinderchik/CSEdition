@@ -64,20 +64,19 @@ public class CSHudOverlay {
     }
 
     /**
-     * Рисуем кастомный HUD ровно один раз за кадр — в Post-событии overlay'а
-     * minecraft:hotbar (последний из отменяемых). Это исключает дубль-рисование
-     * и проблему millis-дедупа (now == lastDrawMillis пропускал кадры целиком).
+     * Публичный метод рендера HUD — вызывается из кастомного overlay,
+     * зарегистрированного через RegisterGuiOverlaysEvent.
+     * Гарантирует ровно 1 вызов/кадр (Forge сам управляет порядком overlay'ов).
+     *
+     * Раньше рисовали в Post minecraft:hotbar, но при отмене Pre Post не
+     * стреляет — overlay целиком пропускается. Кастомный overlay решает это.
      */
-    @SubscribeEvent
-    public void onRenderPost(RenderGuiOverlayEvent.Post event) {
+    public void render(GuiGraphics g) {
         if (ClientState.getPhase() == GamePhase.LOBBY) return;
-        if (!"minecraft:hotbar".equals(event.getOverlay().id().toString())) return;
-
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
         if (mc.options.hideGui) return;
 
-        GuiGraphics g = event.getGuiGraphics();
         int w = mc.getWindow().getGuiScaledWidth();
         int h = mc.getWindow().getGuiScaledHeight();
         Layout layout = Layout.forScreen(w, h);

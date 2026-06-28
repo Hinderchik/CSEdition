@@ -51,9 +51,22 @@ public class CSEditionMod {
 
     private void clientSetup(final FMLClientSetupEvent event) {
         if (FMLEnvironment.dist == Dist.CLIENT) {
-            MinecraftForge.EVENT_BUS.register(new com.csedition.client.hud.CSHudOverlay());
+            // CSHudOverlay — отдельный инстанс, чтобы Pre-cancel и custom overlay
+            // рендер использовали одно и то же состояние кэшей.
+            com.csedition.client.hud.CSHudOverlay hudOverlay =
+                    new com.csedition.client.hud.CSHudOverlay();
+            MinecraftForge.EVENT_BUS.register(hudOverlay);
             MinecraftForge.EVENT_BUS.register(new com.csedition.client.input.InputHandler());
             modBus.addListener(com.csedition.client.keybind.KeyBindings::onRegister);
+            // Кастомный overlay — единственный надёжный способ рисовать HUD ровно
+            // 1 раз/кадр. Post-событие minecraft:hotbar не стреляет, когда Pre
+            // отменён (overlay пропускается целиком).
+            modBus.addListener((net.minecraftforge.client.event.RegisterGuiOverlaysEvent ev) -> {
+                ev.registerAbove(
+                        net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id(),
+                        "csedition_hud",
+                        (gui, g, partialTick, sw, sh) -> hudOverlay.render(g));
+            });
             LOGGER.info("[CS-Edition] Client setup complete.");
         }
     }
