@@ -94,28 +94,39 @@ public final class TaczHelper {
     /**
      * Ищет официальный API TaCZ (GunItem.createGun).
      * Поддерживает две сигнатуры: ResourceLocation и String.
+     * Путь GunItem — com.tacz.guns.item (plural) в TaCZ 1.1.x.
      */
     private static Method getCreateGunMethod() {
         if (API_CHECKED) return CREATE_GUN_METHOD;
         API_CHECKED = true;
-        try {
-            GUN_ITEM_CLASS = Class.forName("com.tacz.gun.item.GunItem");
+        // Список возможных путей для разных версий TaCZ
+        String[] candidatePaths = {
+            "com.tacz.guns.item.GunItem",     // 1.1.x
+            "com.tacz.gun.item.GunItem",      // старые версии
+        };
+        for (String path : candidatePaths) {
             try {
-                CREATE_GUN_METHOD = GUN_ITEM_CLASS.getMethod("createGun", ResourceLocation.class);
-                API_AVAILABLE = true;
-                CSEditionMod.LOGGER.info("[CS-Edition] TaCZ API (createGun(ResourceLocation)) OK");
-            } catch (NoSuchMethodException e1) {
+                GUN_ITEM_CLASS = Class.forName(path);
                 try {
-                    CREATE_GUN_METHOD = GUN_ITEM_CLASS.getMethod("createGun", String.class);
+                    CREATE_GUN_METHOD = GUN_ITEM_CLASS.getMethod("createGun", ResourceLocation.class);
                     API_AVAILABLE = true;
-                    CSEditionMod.LOGGER.info("[CS-Edition] TaCZ API (createGun(String)) OK");
-                } catch (NoSuchMethodException e2) {
-                    CSEditionMod.LOGGER.warn("[CS-Edition] GunItem.createGun not found - using NBT fallback");
+                    CSEditionMod.LOGGER.info("[CS-Edition] TaCZ API OK ({})", path);
+                    return CREATE_GUN_METHOD;
+                } catch (NoSuchMethodException e1) {
+                    try {
+                        CREATE_GUN_METHOD = GUN_ITEM_CLASS.getMethod("createGun", String.class);
+                        API_AVAILABLE = true;
+                        CSEditionMod.LOGGER.info("[CS-Edition] TaCZ API (String) OK ({})", path);
+                        return CREATE_GUN_METHOD;
+                    } catch (NoSuchMethodException e2) {
+                        CSEditionMod.LOGGER.warn("[CS-Edition] GunItem.createGun not found at {}", path);
+                    }
                 }
+            } catch (ClassNotFoundException e) {
+                // пробуем следующий путь
             }
-        } catch (ClassNotFoundException e) {
-            CSEditionMod.LOGGER.warn("[CS-Edition] TaCZ not found - using NBT fallback");
         }
+        CSEditionMod.LOGGER.warn("[CS-Edition] TaCZ not found - using NBT fallback");
         return CREATE_GUN_METHOD;
     }
 
@@ -190,13 +201,12 @@ public final class TaczHelper {
             ItemStack stack = new ItemStack(baseItem);
             CompoundTag tag = stack.getOrCreateTag();
             tag.putString("GunId", gunId);
-            if (!tag.contains("GunFireMode")) {
-                tag.putInt("GunFireMode", 0);
-            }
+            // НЕ ставим GunFireMode — TaCZ использует default из gun data,
+            // и неверное значение даёт "Unknown fire mode, unable to shoot"
             int mag = magazineSizeFor(gunId);
             tag.putInt("AmmoCount", mag);
             tag.putInt("AmmoCountMax", mag);
-            // Патрон в стволе — для одиночного режима сразу можно стрелять
+            // Патрон в стволе — чтобы можно было стрелять сразу
             if (!tag.contains("HasBulletInBarrel")) {
                 tag.putBoolean("HasBulletInBarrel", true);
             }
@@ -225,6 +235,7 @@ public final class TaczHelper {
     /**
      * Если в NBT пушки нет AmmoCount/AmmoCountMax, дописывает значения из таблицы.
      * Нужно на случай когда TaCZ API вернул пушку без ammo-тегов.
+     * НЕ трогает GunFireMode — TaCZ сам разберётся из gun data.
      */
     private static ItemStack ensureLoaded(ItemStack stack, String gunId) {
         if (stack.isEmpty() || !stack.hasTag()) return stack;

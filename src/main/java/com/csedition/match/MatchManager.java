@@ -387,6 +387,16 @@ public class MatchManager {
             player.sendSystemMessage(Component.literal("Not enough money!"));
             return;
         }
+
+        // === Спецслучай: броня (kevlar/helmet) ===
+        // Это НЕ TaCZ-пушки — добавляем armor attribute напрямую, без выдачи предмета.
+        if (isArmorId(gunId)) {
+            applyArmor(player, gunId);
+            sendMoneyUpdate(player, pd);
+            player.sendSystemMessage(Component.literal("§a+" + armorPointsFor(gunId) + " armor"));
+            return;
+        }
+
         ItemStack gun = TaczHelper.createGun(gunId);
         if (gun.isEmpty()) {
             pd.addMoney(price);
@@ -401,6 +411,57 @@ public class MatchManager {
         }
         player.getInventory().add(gun);
         sendMoneyUpdate(player, pd);
+    }
+
+    /**
+     * Это броня (kevlar/helmet), а не TaCZ-пушка.
+     */
+    private static boolean isArmorId(String gunId) {
+        return "tacz:kevlar".equals(gunId) || "tacz:helmet".equals(gunId);
+    }
+
+    /**
+     * Сколько armor-очков даёт предмет.
+     */
+    private static int armorPointsFor(String gunId) {
+        return "tacz:helmet".equals(gunId) ? 100 : 50; // шлем даёт больше (helmet + kevlar)
+    }
+
+    /**
+     * Применяет броню: ставит leather_chestplate/leather_helmet в armor-слот,
+     * либо добавляет armor attribute если слот занят.
+     *
+     * Использует уникальный UUID для модификатора чтобы не дублировать.
+     */
+    private static final java.util.UUID ARMOR_MODIFIER_ID =
+            java.util.UUID.fromString("9c5b6f1e-3a2d-4e8b-9f1c-7a8b9c0d1e2f");
+
+    private void applyArmor(ServerPlayer player, String gunId) {
+        var armorAttr = player.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR);
+        if (armorAttr == null) return;
+        // Убираем старый модификатор если был
+        armorAttr.removeModifier(ARMOR_MODIFIER_ID);
+        // Добавляем новый
+        int points = armorPointsFor(gunId);
+        var modifier = new net.minecraft.world.entity.ai.attributes.AttributeModifier(
+                ARMOR_MODIFIER_ID, "cs-edition armor", points,
+                net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADDITION);
+        armorAttr.addPermanentModifier(modifier);
+        // Также ставим визуальный armor- предмет в слот
+        try {
+            String itemId = "tacz:helmet".equals(gunId)
+                    ? "minecraft:leather_helmet"
+                    : "minecraft:leather_chestplate";
+            var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(
+                    new net.minecraft.resources.ResourceLocation(itemId));
+            if (item != null) {
+                int slot = "tacz:helmet".equals(gunId) ? 3 : 2; // head=3, chest=2
+                var inv = player.getInventory();
+                if (inv.armor.get(slot).isEmpty()) {
+                    inv.armor.set(slot, new net.minecraft.world.item.ItemStack(item));
+                }
+            }
+        } catch (Exception ignored) {}
     }
 
     /**
