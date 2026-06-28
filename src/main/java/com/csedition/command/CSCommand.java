@@ -108,6 +108,21 @@ public class CSCommand {
                                         .executes(ctx -> adminGive(ctx,
                                                 net.minecraft.commands.arguments.EntityArgument.getPlayer(ctx, "player"),
                                                 StringArgumentType.getString(ctx, "gunId"))))))
+                // Admin: give ammo to a player for a specific gun
+                .then(Commands.literal("giveammo")
+                        .then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player())
+                                .then(Commands.argument("gunId", StringArgumentType.string())
+                                        .executes(ctx -> adminGiveAmmo(ctx,
+                                                net.minecraft.commands.arguments.EntityArgument.getPlayer(ctx, "player"),
+                                                StringArgumentType.getString(ctx, "gunId"),
+                                                com.csedition.config.WeaponConfig.getMagazineSize(
+                                                        com.csedition.tacz.TaczHelper.normalizeGunId(
+                                                                StringArgumentType.getString(ctx, "gunId"))) * 3))
+                                        .then(Commands.argument("amount", IntegerArgumentType.integer(1, 999))
+                                                .executes(ctx -> adminGiveAmmo(ctx,
+                                                        net.minecraft.commands.arguments.EntityArgument.getPlayer(ctx, "player"),
+                                                        StringArgumentType.getString(ctx, "gunId"),
+                                                        IntegerArgumentType.getInteger(ctx, "amount")))))))
                 // Modes
                 .then(Commands.literal("mode")
                         .then(Commands.argument("modeId", StringArgumentType.string())
@@ -367,6 +382,34 @@ public class CSCommand {
             CSEditionMod.LOGGER.warn("[CS-Edition] /give fallback failed: {}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Admin: give ammo to a target player for a specific gun.
+     * Usage: /cs giveammo <player> <gunId> [amount]
+     * Default amount = magazineSize * 3 (3 full mags).
+     */
+    private int adminGiveAmmo(CommandContext<CommandSourceStack> ctx, ServerPlayer target, String gunId, int amount) {
+        gunId = com.csedition.tacz.TaczHelper.normalizeGunId(gunId);
+        if (GunPriceTable.getPrice(gunId) < 0) {
+            ctx.getSource().sendSystemMessage(Component.literal(
+                    "§cUnknown weapon: " + gunId + " (use /cs list guns)"));
+            return 0;
+        }
+        if (amount <= 0) {
+            ctx.getSource().sendSystemMessage(Component.literal("§cAmount must be > 0"));
+            return 0;
+        }
+        if (com.csedition.tacz.TaczHelper.giveAmmo(target, gunId, amount)) {
+            ctx.getSource().sendSystemMessage(Component.literal(
+                    "§aGiven §e" + amount + " §aammo for §e" + gunId + " §ato §e" + target.getName().getString()));
+            target.sendSystemMessage(Component.literal(
+                    "§aYou received: §e" + amount + " §aammo for §e" + gunId));
+            return 1;
+        }
+        ctx.getSource().sendSystemMessage(Component.literal(
+                "§cFailed to give ammo (tacz:ammo item missing?)"));
+        return 0;
     }
 
     private int setMode(CommandContext<CommandSourceStack> ctx, String modeId) {

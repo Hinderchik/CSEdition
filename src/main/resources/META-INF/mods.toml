@@ -6,7 +6,22 @@ license="MIT"
 modId="csedition"
 version="${file.jarVersion}"
 displayName="CS Edition"
-description="CS-style shooter mod built on top of TaCZ for Minecraft 1.20.1"
+description="""
+§6§lCS Edition §r§7— Counter-Strike прямо в Minecraft.
+
+§fСражайся 5 на 5 в классических раундах: §eзакупка §f→ §cбой §f→ §6конец раунда.
+§fПокупай оружие в зоне закупки, закладывай бомбу, выбивай победу.
+
+§aОсобенности:
+§7 ▸ §fКастомный вертикальный HUD в стиле мобильных шутеров
+§7 ▸ §fСистема раундов с фазами LOBBY / BUY_TIME / FIGHTING / ROUND_END
+§7 ▸ §fЗоны закупки и спавны для T и CT
+§7 ▸ §fВыдача оружия и патронов через §e/cs give §fи §e/cs giveammo
+§7 ▸ §fПолная интеграция с §bTaCZ §7(оружие, патроны, обвесы)
+
+§eКоманды: §f/cs help §7— список всех команд
+§eGitHub: §fgithub.com/Hinderchik/mods
+"""
 authors="Hinderchik"
 logoFile="icon.png"
 

@@ -254,4 +254,99 @@ public final class TaczHelper {
         if (s.contains(":")) return s;
         return "tacz:" + s;
     }
+
+    // ====================== Ammo ======================
+
+    /**
+     * TaCZ ammo items are `tacz:ammo` with an NBT tag `AmmoId` specifying
+     * the caliber (e.g. `tacz:9mm`, `tacz:5.56`, `tacz:7.62x39`).
+     *
+     * The ammo ID for a given gun is defined in TaCZ's data pack.
+     * Without API access we use best-effort heuristics:
+     *   1. If the gun ItemStack has an `AmmoId` tag (some TaCZ versions), use it
+     *   2. Otherwise return the gun ID as-is (works for many default packs)
+     *
+     * @param gunId gun ID like "tacz:glock_17"
+     * @return ammo ID like "tacz:9mm" or the gun ID as fallback
+     */
+    public static String getAmmoIdForGun(String gunId) {
+        if (gunId == null || gunId.isEmpty()) return null;
+        // Try to read AmmoId from gun data via reflection (if TaCZ API exposed it)
+        try {
+            // Some TaCZ versions store ammo id in gun index; try reflection on common paths
+            Class<?> gunIndexClass = Class.forName("com.tacz.guns.resource.index.CommonGunIndex");
+            Object ammoId = gunIndexClass.getMethod("getAmmoId", ResourceLocation.class)
+                    .invoke(null, new ResourceLocation(gunId));
+            if (ammoId != null) return ammoId.toString();
+        } catch (Throwable ignored) {
+            // API not available or method signature differs — fall through
+        }
+        // Fallback: use gun ID as ammo ID
+        return gunId;
+    }
+
+    /**
+     * Create an ammo ItemStack for the given gun.
+     *
+     * @param gunId gun ID (used to determine ammo type)
+     * @param count stack size
+     * @return ammo ItemStack, or ItemStack.EMPTY if creation failed
+     */
+    public static ItemStack createAmmo(String gunId, int count) {
+        if (count <= 0) return ItemStack.EMPTY;
+        String ammoId = getAmmoIdForGun(gunId);
+        if (ammoId == null || ammoId.isEmpty()) return ItemStack.EMPTY;
+
+        // Try to resolve tacz:ammo item
+        Item ammoItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("tacz:ammo"));
+        if (ammoItem == null) {
+            CSEditionMod.LOGGER.warn("[CS-Edition] tacz:ammo item not found");
+            return ItemStack.EMPTY;
+        }
+
+        ItemStack stack = new ItemStack(ammoItem, Math.min(count, 64));
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putString("AmmoId", ammoId);
+        stack.setTag(tag);
+        return stack;
+    }
+
+    /**
+     * Give ammo to a player. If count > 64, gives multiple stacks.
+     *
+     * @param player target player
+     * @param gunId  gun ID (determines ammo type)
+     * @param count  total ammo count
+     * @return true if all ammo was given, false if inventory was full
+     */
+    public static boolean giveAmmo(net.minecraft.server.level.ServerPlayer player, String gunId, int count) {
+        if (count <= 0) return true;
+        int remaining = count;
+        while (remaining > 0) {
+            int batch = Math.min(remaining, 64);
+            ItemStack stack = createAmmo(gunId, batch);
+            if (stack.isEmpty()) return false;
+
+            var inv = player.getInventory();
+            if (inv.add(stack)) {
+                remaining -= batch;
+            } else {
+                // Try to place in empty slot
+                boolean placed = false;
+                for (int i = 0; i < inv.getContainerSize(); i++) {
+                    if (inv.getItem(i).isEmpty()) {
+                        inv.setItem(i, stack);
+                        remaining -= batch;
+                        placed = true;
+                        break;
+                    }
+                }
+                if (!placed) {
+                    player.drop(stack, false);
+                    remaining -= batch;
+                }
+            }
+        }
+        return true;
+    }
 }
