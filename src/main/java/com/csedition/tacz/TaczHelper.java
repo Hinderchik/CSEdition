@@ -1,6 +1,7 @@
 package com.csedition.tacz;
 
 import com.csedition.CSEditionMod;
+import com.csedition.config.WeaponConfig;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -9,29 +10,8 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Утилита для создания пушек TaCZ (CS Edition).
- *
- * Правильный NBT-формат пушки (как в /give):
- *   tacz:modern_kinetic_gun{
- *     GunId: "tacz:ak47",                    // string — id оружия в TaCZ-датапаке
- *     GunFireMode: "AUTO",                   // string — "SEMI"/"AUTO"/"BURST"
- *     GunCurrentAmmoCount: 30,               // int — патронов сейчас
- *     GunMaxAmmoCount: 30,                   // int — размер магазина
- *     HasBulletInBarrel: 1b,                 // bool — патрон в стволе
- *     AmmoCount: 30,                         // (старый тег, для совместимости)
- *     AmmoCountMax: 30,                      // (старый тег, для совместимости)
- *     AttachmentMUZZLE: { id:"tacz:attachment", Count:1b, tag:{AttachmentId:"..."} },
- *     AttachmentGRIP:   { ... },
- *     AttachmentSCOPE:  { ... },
- *     AttachmentSTOCK:  { ... },
- *     AttachmentMAGAZINE:{ ... }
- *   }
- */
 public final class TaczHelper {
     private TaczHelper() {}
 
@@ -50,118 +30,12 @@ public final class TaczHelper {
             "tacz:modern_kinetic_gun_debug",
     };
 
-    /**
-     * Размеры магазинов для пушек, которые реально используются в проекте.
-     * Используется в NBT-fallback и в /give команде как GunCurrentAmmoCount.
-     *
-     * Если пушки нет в этой карте — используется дефолт 30.
-     * Чтобы добавить новую пушку — просто пропиши её здесь.
-     */
-    private static final Map<String, Integer> MAGAZINE_SIZES = new HashMap<>();
-    static {
-        // Пистолеты
-        MAGAZINE_SIZES.put("tacz:glock_17", 17);
-        MAGAZINE_SIZES.put("mcs2:cs_usp", 12);
-        MAGAZINE_SIZES.put("tacz:p320", 17);
-        MAGAZINE_SIZES.put("tacz:deagle", 7);
-        MAGAZINE_SIZES.put("tacz:cz75", 16);
-        // SMG
-        MAGAZINE_SIZES.put("tacz:hk_mp5a5", 30);
-        MAGAZINE_SIZES.put("tacz:ump45", 30);
-        MAGAZINE_SIZES.put("tacz:p90", 50);
-        MAGAZINE_SIZES.put("tacz:uzi", 32);
-        // Винтовки
-        MAGAZINE_SIZES.put("tacz:ak47", 30);
-        MAGAZINE_SIZES.put("tacz:m4a1", 30);
-        MAGAZINE_SIZES.put("tacz:fn_fal", 30);
-        MAGAZINE_SIZES.put("tacz:hk416d", 30);
-        MAGAZINE_SIZES.put("tacz:qbz_95", 30);
-        MAGAZINE_SIZES.put("tacz:aug", 30);
-        MAGAZINE_SIZES.put("tacz:scar_l", 30);
-        MAGAZINE_SIZES.put("tacz:scar_h", 30);
-        // Снайперские
-        MAGAZINE_SIZES.put("tacz:ai_awp", 5);
-        MAGAZINE_SIZES.put("mcs2:cs_awp", 5);
-        MAGAZINE_SIZES.put("tacz:m700", 5);
-        // Дробовики
-        MAGAZINE_SIZES.put("tacz:m870", 5);
-        MAGAZINE_SIZES.put("tacz:spas_12", 6);
-        // LMG
-        MAGAZINE_SIZES.put("tacz:m249", 100);
-        MAGAZINE_SIZES.put("tacz:fn_evolys", 75);
-    }
-
-    /**
-     * Fire mode по умолчанию для каждой пушки.
-     * "SEMI" = полуавтомат, "AUTO" = автомат, "BURST" = очередь.
-     * Если пушки нет — дефолт "SEMI".
-     */
-    private static final Map<String, String> DEFAULT_FIRE_MODES = new HashMap<>();
-    static {
-        // Пистолеты — все SEMI
-        DEFAULT_FIRE_MODES.put("tacz:glock_17", "SEMI");
-        DEFAULT_FIRE_MODES.put("mcs2:cs_usp", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:p320", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:deagle", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:cz75", "SEMI");
-        // SMG — все AUTO
-        DEFAULT_FIRE_MODES.put("tacz:hk_mp5a5", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:ump45", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:p90", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:uzi", "AUTO");
-        // Винтовки — все AUTO
-        DEFAULT_FIRE_MODES.put("tacz:ak47", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:m4a1", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:fn_fal", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:hk416d", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:qbz_95", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:aug", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:scar_l", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:scar_h", "AUTO");
-        // Снайперские — все SEMI
-        DEFAULT_FIRE_MODES.put("tacz:ai_awp", "SEMI");
-        DEFAULT_FIRE_MODES.put("mcs2:cs_awp", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:m700", "SEMI");
-        // Дробовики — все SEMI
-        DEFAULT_FIRE_MODES.put("tacz:m870", "SEMI");
-        DEFAULT_FIRE_MODES.put("tacz:spas_12", "SEMI");
-        // LMG — все AUTO
-        DEFAULT_FIRE_MODES.put("tacz:m249", "AUTO");
-        DEFAULT_FIRE_MODES.put("tacz:fn_evolys", "AUTO");
-    }
-
-    /**
-     * Автоматически устанавливаемые аттачменты для конкретных пушек.
-     * Ключ — GunId пушки, значение — map слота → AttachmentId.
-     * Слоты: AttachmentMUZZLE, AttachmentGRIP, AttachmentSCOPE, AttachmentSTOCK, AttachmentMAGAZINE.
-     */
-    private static final Map<String, Map<String, String>> GUN_ATTACHMENTS = new LinkedHashMap<>();
-    static {
-        // MCS2 (мод MCS2-Knifepack с USP silencer)
-        GUN_ATTACHMENTS.put("mcs2:cs_usp", Map.of("AttachmentMUZZLE", "mcs2:usp_silencer"));
-        // Примеры для других модов — добавляй сюда по мере надобности
-    }
-
-    private static int magazineSizeFor(String gunId) {
-        Integer m = MAGAZINE_SIZES.get(gunId);
-        return m != null ? m : 30;
-    }
-
-    private static String fireModeFor(String gunId) {
-        String m = DEFAULT_FIRE_MODES.get(gunId);
-        return m != null ? m : "SEMI";
-    }
-
-    /**
-     * Ищет официальный API TaCZ (GunItem.createGun).
-     * Путь GunItem — com.tacz.guns.item (plural) в TaCZ 1.1.x.
-     */
     private static Method getCreateGunMethod() {
         if (API_CHECKED) return CREATE_GUN_METHOD;
         API_CHECKED = true;
         String[] candidatePaths = {
-            "com.tacz.guns.item.GunItem",     // 1.1.x
-            "com.tacz.gun.item.GunItem",      // старые
+            "com.tacz.guns.item.GunItem",
+            "com.tacz.gun.item.GunItem",
         };
         for (String path : candidatePaths) {
             try {
@@ -219,24 +93,16 @@ public final class TaczHelper {
         return null;
     }
 
-    /**
-     * Создаёт ItemStack пушки TaCZ по её id.
-     * Использует правильный NBT-формат: GunId + GunFireMode(string) + GunCurrentAmmoCount + attachments.
-     */
     public static ItemStack createGun(String gunId) {
         if (gunId == null || gunId.isEmpty()) return ItemStack.EMPTY;
         ResourceLocation rl = new ResourceLocation(gunId);
 
-        // 1) Официальный API TaCZ (если доступен)
         Method method = getCreateGunMethod();
         if (method != null) {
             try {
-                Object result;
-                if (method.getParameterTypes()[0] == ResourceLocation.class) {
-                    result = method.invoke(null, rl);
-                } else {
-                    result = method.invoke(null, gunId);
-                }
+                Object result = (method.getParameterTypes()[0] == ResourceLocation.class)
+                        ? method.invoke(null, rl)
+                        : method.invoke(null, gunId);
                 if (result instanceof ItemStack stack && !stack.isEmpty()) {
                     return ensureLoaded(stack, gunId);
                 }
@@ -245,56 +111,37 @@ public final class TaczHelper {
             }
         }
 
-        // 2) NBT-fallback через базовый gun-item
         Item baseItem = getBaseGunItem();
-        if (baseItem != null) {
-            return buildGunNbt(gunId, baseItem);
-        }
+        if (baseItem != null) return buildGunNbt(gunId, baseItem);
 
-        // 3) Прямой поиск в реестре (последний шанс)
         Item directItem = ForgeRegistries.ITEMS.getValue(rl);
-        if (directItem != null) {
-            return buildGunNbt(gunId, directItem);
-        }
+        if (directItem != null) return buildGunNbt(gunId, directItem);
 
         CSEditionMod.LOGGER.warn("[CS-Edition] Gun not found: {} (TaCZ API: {})", gunId, API_AVAILABLE);
         return ItemStack.EMPTY;
     }
 
-    /**
-     * Строит ItemStack с правильным NBT для пушки.
-     * Формат соответствует /give: GunId, GunFireMode (string), GunCurrentAmmoCount, attachments.
-     */
     private static ItemStack buildGunNbt(String gunId, Item baseItem) {
         ItemStack stack = new ItemStack(baseItem);
         CompoundTag tag = stack.getOrCreateTag();
         tag.putString("GunId", gunId);
-        // Fire mode — STRING (не int!), значения "SEMI"/"AUTO"/"BURST"
-        tag.putString("GunFireMode", fireModeFor(gunId));
-        // Ammo — оба варианта для совместимости со старыми и новыми версиями TaCZ
-        int mag = magazineSizeFor(gunId);
+        tag.putString("GunFireMode", WeaponConfig.getFireMode(gunId));
+        int mag = WeaponConfig.getMagazineSize(gunId);
         tag.putInt("GunCurrentAmmoCount", mag);
         tag.putInt("GunMaxAmmoCount", mag);
         tag.putInt("AmmoCount", mag);
         tag.putInt("AmmoCountMax", mag);
         tag.putBoolean("HasBulletInBarrel", true);
 
-        // Автоматические аттачменты для этой пушки
         applyAttachments(tag, gunId);
-
         stack.setTag(tag);
-        CSEditionMod.LOGGER.debug("[CS-Edition] Built gun NBT for: {} (mag={}, mode={})",
-                gunId, mag, fireModeFor(gunId));
+        CSEditionMod.LOGGER.debug("[CS-Edition] Built gun NBT for: {} (mag={})", gunId, mag);
         return stack;
     }
 
-    /**
-     * Добавляет автоматические аттачменты (глушитель, прицел и т.д.) для конкретной пушки.
-     * Формат в NBT: AttachmentMUZZLE: { id:"tacz:attachment", Count:1b, tag:{AttachmentId:"..."} }
-     */
     private static void applyAttachments(CompoundTag gunTag, String gunId) {
-        Map<String, String> attachments = GUN_ATTACHMENTS.get(gunId);
-        if (attachments == null) return;
+        Map<String, String> attachments = WeaponConfig.getAttachments(gunId);
+        if (attachments.isEmpty()) return;
         for (Map.Entry<String, String> entry : attachments.entrySet()) {
             CompoundTag attachmentItem = new CompoundTag();
             attachmentItem.putString("id", "tacz:attachment");
@@ -303,38 +150,28 @@ public final class TaczHelper {
             innerTag.putString("AttachmentId", entry.getValue());
             attachmentItem.put("tag", innerTag);
             gunTag.put(entry.getKey(), attachmentItem);
-            CSEditionMod.LOGGER.debug("[CS-Edition] Auto-attached {} -> {} to {}",
-                    entry.getKey(), entry.getValue(), gunId);
         }
     }
 
-    /**
-     * Дополняет NBT пушки недостающими полями.
-     * Если API уже вернул пушку с правильным NBT — не трогает её.
-     */
     private static ItemStack ensureLoaded(ItemStack stack, String gunId) {
         if (stack.isEmpty() || !stack.hasTag()) return stack;
         CompoundTag tag = stack.getTag();
         if (tag == null) return stack;
         boolean modified = false;
-        // Fire mode — только если нет
         if (!tag.contains("GunFireMode")) {
-            tag.putString("GunFireMode", fireModeFor(gunId));
+            tag.putString("GunFireMode", WeaponConfig.getFireMode(gunId));
             modified = true;
         }
-        // Ammo
         if (!tag.contains("GunCurrentAmmoCount")) {
-            int mag = magazineSizeFor(gunId);
+            int mag = WeaponConfig.getMagazineSize(gunId);
             tag.putInt("GunCurrentAmmoCount", mag);
             tag.putInt("GunMaxAmmoCount", mag);
             modified = true;
         }
-        // Bullet in barrel
         if (!tag.contains("HasBulletInBarrel")) {
             tag.putBoolean("HasBulletInBarrel", true);
             modified = true;
         }
-        // Авто-аттачменты — применяем всегда (они идемпотентны)
         applyAttachments(tag, gunId);
         modified = true;
         if (modified) stack.setTag(tag);
@@ -346,7 +183,7 @@ public final class TaczHelper {
     }
 
     public static ItemStack createPistol(boolean isT) {
-        return createGun(isT ? "tacz:glock_17" : "tacz:usp_45");
+        return createGun(isT ? "tacz:glock_17" : "mcs2:cs_usp");
     }
 
     public static boolean isTaczAvailable() {
@@ -354,9 +191,6 @@ public final class TaczHelper {
         return API_AVAILABLE;
     }
 
-    /**
-     * Выдаёт пушку игроку. Возвращает true если успешно.
-     */
     public static boolean giveGun(net.minecraft.server.level.ServerPlayer player, String gunId) {
         ItemStack stack = createGun(gunId);
         if (stack.isEmpty()) {
@@ -392,40 +226,27 @@ public final class TaczHelper {
         return true;
     }
 
-    /**
-     * Строит команду /give для указанной пушки.
-     * Используется как fallback / для отображения админу.
-     *
-     * Примеры:
-     *   /give Steve tacz:modern_kinetic_gun{GunId:"tacz:ak47", GunFireMode:"AUTO", GunCurrentAmmoCount:30}
-     *   /give Steve tacz:modern_kinetic_gun{GunId:"mcs2:cs_usp", GunFireMode:"SEMI", GunCurrentAmmoCount:12, AttachmentMUZZLE:{id:"tacz:attachment", Count:1b, tag:{AttachmentId:"mcs2:usp_silencer"}}}
-     */
     public static String buildGiveCommand(String targetName, String gunId) {
-        int mag = magazineSizeFor(gunId);
-        String mode = fireModeFor(gunId);
-        StringBuilder sb = new StringBuilder();
+        int mag = WeaponConfig.getMagazineSize(gunId);
+        String mode = WeaponConfig.getFireMode(gunId);
+        Map<String, String> attachments = WeaponConfig.getAttachments(gunId);
+
+        StringBuilder sb = new StringBuilder(128);
         sb.append("/give ").append(targetName)
           .append(" tacz:modern_kinetic_gun{")
           .append("GunId:\"").append(gunId).append("\"")
           .append(",GunFireMode:\"").append(mode).append("\"")
           .append(",GunCurrentAmmoCount:").append(mag)
           .append(",GunMaxAmmoCount:").append(mag);
-        // Авто-аттачменты
-        Map<String, String> attachments = GUN_ATTACHMENTS.get(gunId);
-        if (attachments != null) {
-            for (Map.Entry<String, String> entry : attachments.entrySet()) {
-                sb.append(",").append(entry.getKey())
-                  .append(":{id:\"tacz:attachment\",Count:1b,tag:{AttachmentId:\"")
-                  .append(entry.getValue()).append("\"}}");
-            }
+        for (Map.Entry<String, String> entry : attachments.entrySet()) {
+            sb.append(",").append(entry.getKey())
+              .append(":{id:\"tacz:attachment\",Count:1b,tag:{AttachmentId:\"")
+              .append(entry.getValue()).append("\"}}");
         }
         sb.append("}");
         return sb.toString();
     }
 
-    /**
-     * Нормализует id оружия: добавляет "tacz:" если нет namespace.
-     */
     public static String normalizeGunId(String input) {
         if (input == null) return null;
         String s = input.trim();
