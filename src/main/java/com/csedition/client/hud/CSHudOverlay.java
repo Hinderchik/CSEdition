@@ -36,6 +36,7 @@ public class CSHudOverlay {
     /** Кэш значений — пропускаем перерисовку блоков если не изменились. */
     private float lastHealthRatio = -1f;
     private int lastArmorValue = -1;
+    private int lastHpInt = -1;
     private int lastMoney = Integer.MIN_VALUE;
     private int lastPhaseTicks = Integer.MIN_VALUE;
     private GamePhase lastPhase = null;
