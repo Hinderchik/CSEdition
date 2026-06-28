@@ -89,12 +89,22 @@ public class CSCommand {
                 .then(Commands.literal("money")
                         .then(Commands.argument("amount", IntegerArgumentType.integer())
                                 .executes(this::giveMoney)))
+                // === Админ: выдать пушку конкретному игроку ===
+                .then(Commands.literal("give")
+                        .then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player())
+                                .then(Commands.argument("gunId", StringArgumentType.string())
+                                        .executes(ctx -> adminGive(ctx,
+                                                net.minecraft.commands.arguments.EntityArgument.getPlayer(ctx, "player"),
+                                                StringArgumentType.getString(ctx, "gunId"))))))
                 // === Режимы ===
                 .then(Commands.literal("mode")
                         .then(Commands.argument("modeId", StringArgumentType.string())
                                 .suggests(MODE_SUGGESTIONS)
                                 .executes(ctx -> setMode(ctx, StringArgumentType.getString(ctx, "modeId")))))
                 .then(Commands.literal("modes").executes(this::listModes))
+                .then(Commands.literal("list")
+                        .then(Commands.literal("guns").executes(this::listGuns))
+                        .then(Commands.literal("modes").executes(this::listModes)))
                 .then(Commands.literal("setmapmode")
                         .then(Commands.argument("mapId", StringArgumentType.string())
                                 .suggests(MAP_SUGGESTIONS)
@@ -191,6 +201,8 @@ public class CSCommand {
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs status§7 — статус"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs maps§7 — список карт"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs money <amount>§7 — выдать деньги"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs give <player> <gunId>§7 — выдать пушку игроку"));
+        ctx.getSource().sendSystemMessage(Component.literal("§e/cs list guns§7 — список доступных пушек"));
         ctx.getSource().sendSystemMessage(Component.literal("§6§l--- Режимы ---"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs mode <modeId>§7 — установить режим"));
         ctx.getSource().sendSystemMessage(Component.literal("§e/cs modes§7 — список режимов"));
@@ -283,6 +295,37 @@ public class CSCommand {
 
     // ====================== Режимы ======================
 
+    /**
+     * Админ-команда: выдать пушку конкретному игроку.
+     * Эквивалент ручного /give Player tacz:modern_kinetic_gun{GunId:"tacz:..."}
+     * Принимает короткие id ("ak47") — автоматически префиксирует "tacz:".
+     *
+     * Использование: /cs give <player> <gunId>
+     */
+    private int adminGive(CommandContext<CommandSourceStack> ctx, ServerPlayer target, String gunId) {
+        gunId = com.csedition.tacz.TaczHelper.normalizeGunId(gunId);
+        // Проверяем что пушка есть в нашей таблице (чтобы не выдавать мусор)
+        int price = GunPriceTable.getPrice(gunId);
+        if (price < 0) {
+            ctx.getSource().sendSystemMessage(Component.literal(
+                    "§cUnknown weapon: " + gunId + " (use /cs list guns)"));
+            return 0;
+        }
+        boolean ok = com.csedition.tacz.TaczHelper.giveGun(target, gunId);
+        if (ok) {
+            ctx.getSource().sendSystemMessage(Component.literal(
+                    "§aGiven §e" + gunId + " §ato §e" + target.getName().getString()));
+            target.sendSystemMessage(Component.literal(
+                    "§aYou received: §e" + gunId));
+            return 1;
+        } else {
+            ctx.getSource().sendSystemMessage(Component.literal(
+                    "§cFailed to give " + gunId + " to " + target.getName().getString()
+                            + " (inventory full?)"));
+            return 0;
+        }
+    }
+
     private int setMode(CommandContext<CommandSourceStack> ctx, String modeId) {
         if (ModeConfig.getMode(modeId) == null) {
             ctx.getSource().sendSystemMessage(Component.literal("§cUnknown mode: " + modeId));
@@ -301,6 +344,27 @@ public class CSCommand {
                 "§e" + m.getId() + " §7(" + m.getDisplayName() + ")" + tag
                 + " §fbuy=" + m.getBuyTimeSeconds() + "s round=" + m.getRoundTimeSeconds() + "s"
                 + " start=$" + m.getStartMoney()));
+        }
+        return 1;
+    }
+
+    /**
+     * Список доступных пушек с ценами и категориями.
+     */
+    private int listGuns(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSystemMessage(Component.literal("§6§l=== Weapons (use /cs test buy <id> or /cs give <player> <id>) ==="));
+        String lastCat = null;
+        for (Map.Entry<String, Integer> e : GunPriceTable.getAll().entrySet()) {
+            String cat = GunPriceTable.getCategory(e.getKey());
+            if (!cat.equals(lastCat)) {
+                ctx.getSource().sendSystemMessage(Component.literal("§7--- " + cat + " ---"));
+                lastCat = cat;
+            }
+            // Показываем короткий id (без "tacz:" префикса) — для удобства ввода
+            String shortId = e.getKey();
+            if (shortId.startsWith("tacz:")) shortId = shortId.substring(5);
+            ctx.getSource().sendSystemMessage(Component.literal(
+                "§e" + shortId + " §7(" + e.getKey() + ") §f$" + e.getValue()));
         }
         return 1;
     }
