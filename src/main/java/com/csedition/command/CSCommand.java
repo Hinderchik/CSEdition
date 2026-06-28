@@ -297,12 +297,13 @@ public class CSCommand {
     // ====================== Режимы ======================
 
     /**
-     * Админ-команда: выдать пушку конкретному игроку.
-     * Эквивалент ручного /give Player tacz:modern_kinetic_gun{GunId:"tacz:..."}
-     * Принимает короткие id ("ak47") — автоматически префиксирует "tacz:".
+     * Админ-команда: выдать пушку конкретному игроку с правильным NBT.
+     * Использует TaczHelper.giveGun (ставит GunFireMode string, GunCurrentAmmoCount,
+     * attachments автоматом).
      *
-     * Если TaczHelper не смог создать пушку (нет TaCZ, битый ItemStack и т.п.)
-     * — выводит в чат точную команду /give которую админ может скопировать.
+     * Если прямой API не сработал (нет TaCZ / битый стек / инвентарь полон) —
+     * выполняет ванильный /give с полным NBT от имени сервера. Если и это не
+     * помогло — выводит точную команду для ручного копирования.
      *
      * Использование: /cs give <player> <gunId>
      */
@@ -314,22 +315,46 @@ public class CSCommand {
                     "§cUnknown weapon: " + gunId + " (use /cs list guns)"));
             return 0;
         }
-        boolean ok = com.csedition.tacz.TaczHelper.giveGun(target, gunId);
-        if (ok) {
+        // 1) Попытка через прямой API
+        if (com.csedition.tacz.TaczHelper.giveGun(target, gunId)) {
             ctx.getSource().sendSystemMessage(Component.literal(
                     "§aGiven §e" + gunId + " §ato §e" + target.getName().getString()));
-            target.sendSystemMessage(Component.literal(
-                    "§aYou received: §e" + gunId));
+            target.sendSystemMessage(Component.literal("§aYou received: §e" + gunId));
             return 1;
         }
-        // Фоллбэк: выводим точную команду /give для копирования
-        String giveCmd = String.format("/give %s tacz:modern_kinetic_gun{GunId:\"%s\"}",
+        // 2) Фоллбэк: выполняем /give от сервера
+        String giveCmd = com.csedition.tacz.TaczHelper.buildGiveCommand(
                 target.getName().getString(), gunId);
+        if (tryRunGive(ctx, giveCmd)) {
+            ctx.getSource().sendSystemMessage(Component.literal(
+                    "§aGiven §e" + gunId + " §ato §e" + target.getName().getString()
+                            + " §7(via /give fallback)"));
+            return 1;
+        }
+        // 3) Совсем плохо — выводим команду руками
         ctx.getSource().sendSystemMessage(Component.literal(
-                "§cAPI не смог выдать " + gunId + " (инвентарь полон или нет TaCZ)."));
+                "§cНе удалось выдать " + gunId + " (инвентарь полон?)."));
         ctx.getSource().sendSystemMessage(Component.literal(
-                "§eFallback — выполни вручную: §f" + giveCmd));
+                "§eВыполни вручную: §f" + giveCmd));
         return 0;
+    }
+
+    /**
+     * Выполняет /give от имени сервера.
+     * Используется как fallback если TaczHelper.giveGun не справился.
+     */
+    private static boolean tryRunGive(CommandContext<CommandSourceStack> ctx, String giveCommand) {
+        try {
+            var server = ctx.getSource().getServer();
+            // Strip leading "/" — performPrefixedCommand ожидает команду без слеша
+            String cmd = giveCommand.startsWith("/") ? giveCommand.substring(1) : giveCommand;
+            int result = server.getCommands().performPrefixedCommand(
+                    ctx.getSource().withSuppressedOutput(), cmd);
+            return result > 0;
+        } catch (Exception e) {
+            CSEditionMod.LOGGER.warn("[CS-Edition] /give fallback failed: {}", e.getMessage());
+            return false;
+        }
     }
 
     private int setMode(CommandContext<CommandSourceStack> ctx, String modeId) {
@@ -603,21 +628,25 @@ public class CSCommand {
     /**
      * Тестовая выдача: выдаёт оружие бесплатно, без проверок.
      * Принимает короткие id ("ak47") — автоматически префиксирует "tacz:".
-     * Фоллбэк: если API не сработал — выводит точную /give команду.
+     * Если API не сработал — выполняет /give от сервера с полным NBT.
      */
     private int testGive(CommandContext<CommandSourceStack> ctx, String gunId) {
         try {
             ServerPlayer p = ctx.getSource().getPlayerOrException();
             gunId = com.csedition.tacz.TaczHelper.normalizeGunId(gunId);
-            boolean ok = com.csedition.tacz.TaczHelper.giveGun(p, gunId);
-            if (ok) {
+            if (com.csedition.tacz.TaczHelper.giveGun(p, gunId)) {
                 p.sendSystemMessage(Component.literal("§aGiven: " + gunId));
                 return 1;
             }
-            String giveCmd = String.format("/give %s tacz:modern_kinetic_gun{GunId:\"%s\"}",
+            // Фоллбэк: /give с полным NBT (GunFireMode, GunCurrentAmmoCount, attachments)
+            String giveCmd = com.csedition.tacz.TaczHelper.buildGiveCommand(
                     p.getName().getString(), gunId);
+            if (tryRunGive(ctx, giveCmd)) {
+                p.sendSystemMessage(Component.literal("§aGiven: " + gunId + " §7(via /give)"));
+                return 1;
+            }
             p.sendSystemMessage(Component.literal(
-                    "§cAPI не смог выдать " + gunId + " (инвентарь полон или нет TaCZ)."));
+                    "§cНе удалось выдать " + gunId + " (инвентарь полон)."));
             p.sendSystemMessage(Component.literal(
                     "§eВыполни вручную: §f" + giveCmd));
             return 0;
