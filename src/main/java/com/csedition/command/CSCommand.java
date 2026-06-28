@@ -1,5 +1,6 @@
 package com.csedition.command;
 
+import com.csedition.CSEditionMod;
 import com.csedition.config.CSConfig;
 import com.csedition.config.MapConfig;
 import com.csedition.config.ModeConfig;
