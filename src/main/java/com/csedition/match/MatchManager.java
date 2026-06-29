@@ -459,26 +459,35 @@ public class MatchManager {
                     net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADDITION);
             armorAttr.addPermanentModifier(modifier);
         }
-        // Give actual Netherite armor with Protection IV instead of plain leather.
+        // Give actual Netherite armor (chestplate/helmet) with Protection IV.
         // Replaces existing armor in slot (old armor is dropped at player's feet).
-        try {
-            String itemId = "tacz:helmet".equals(gunId)
-                    ? "minecraft:netherite_helmet"
-                    : "minecraft:netherite_chestplate";
-            var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(
-                    new net.minecraft.resources.ResourceLocation(itemId));
-            if (item != null) {
-                int slot = "tacz:helmet".equals(gunId) ? 3 : 2;
-                var inv = player.getInventory();
-                ItemStack armor = new ItemStack(item);
-                armor.enchant(net.minecraft.world.item.enchantment.Enchantments.ALL_DAMAGE_PROTECTION, 4);
-                ItemStack existing = inv.armor.get(slot);
-                if (!existing.isEmpty()) {
-                    player.drop(existing.copy(), false);
-                }
-                inv.armor.set(slot, armor);
+        // Note: armor is placed FIRST, then enchanted — so if enchanting fails
+        // for any reason, the Netherite item is still equipped.
+        String itemId = "tacz:helmet".equals(gunId)
+                ? "minecraft:netherite_helmet"
+                : "minecraft:netherite_chestplate";
+        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(
+                new net.minecraft.resources.ResourceLocation(itemId));
+        if (item != null) {
+            int slot = "tacz:helmet".equals(gunId) ? 3 : 2;
+            var inv = player.getInventory();
+            ItemStack armor = new ItemStack(item);
+            // Place armor FIRST (before enchanting) so it's always equipped
+            ItemStack existing = inv.armor.get(slot);
+            if (!existing.isEmpty()) {
+                player.drop(existing.copy(), false);
             }
-        } catch (Exception ignored) {}
+            inv.armor.set(slot, armor);
+            // Then try to add Protection IV via registry lookup (safer than
+            // relying on Enchantments.ALL_DAMAGE_PROTECTION which may not
+            // be available in all Forge versions)
+            var enchHolder = net.minecraftforge.registries.ForgeRegistries.ENCHANTMENTS
+                    .getHolder(new net.minecraft.resources.ResourceLocation("minecraft:protection"));
+            if (enchHolder.isPresent()) {
+                armor.enchant(enchHolder.get(), 4);
+            }
+        }
+    }
         // Р В Р в‚¬Р В Р’В±Р В РЎвЂР РЋР вЂљР В Р’В°Р В Р’ВµР В РЎВ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚в„–Р В РІвЂћвЂ“ Р В РЎВР В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С›Р В РЎвЂР В РЎвЂќР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљ Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р В Р’В±Р РЋРІР‚в„–Р В Р’В»
         armorAttr.removeModifier(ARMOR_MODIFIER_ID);
         // Р В РІР‚СњР В РЎвЂўР В Р’В±Р В Р’В°Р В Р вЂ Р В Р’В»Р РЋР РЏР В Р’ВµР В РЎВ Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р РЋРІР‚в„–Р В РІвЂћвЂ“
