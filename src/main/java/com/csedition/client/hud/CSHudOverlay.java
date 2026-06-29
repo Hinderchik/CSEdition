@@ -66,18 +66,25 @@ public class CSHudOverlay {
 
     /**
      * Public render method called by the custom overlay
-     * (registered via RegisterGuiOverlaysEvent).
+     * (registered via RegisterGuiOverlaysEvent) AND by the old
+     * RenderGameOverlayEvent.Post fallback (below).
      *
-     * Previously we ALSO drew in Post of minecraft:crosshair as a fallback,
-     * but that caused double-rendering (render() called twice per frame),
-     * which made items disappear when selected. Now we use ONLY the
-     * custom overlay — it's guaranteed to fire exactly once per frame.
+     * A frame counter prevents double-rendering when both paths fire
+     * in the same frame — only the first call draws, subsequent calls
+     * in the same frame are skipped.
      */
+    private long lastFrameDrawn = -1;
+
     public void render(GuiGraphics g) {
         if (ClientState.getPhase() == GamePhase.LOBBY) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
         if (mc.options.hideGui) return;
+
+        // Prevent double-render if both paths fire same frame
+        long frame = mc.getFrameTime(); // nanos
+        if (frame == lastFrameDrawn) return;
+        lastFrameDrawn = frame;
 
         int w = mc.getWindow().getGuiScaledWidth();
         int h = mc.getWindow().getGuiScaledHeight();
@@ -87,6 +94,46 @@ public class CSHudOverlay {
         drawMoney(g, w, h, layout);
         drawPhaseTimer(g, w, h, layout);
         drawHotbar(g, w, h, mc.player, layout);
+    }
+
+    /**
+     * FALLBACK render path — uses the OLD deprecated RenderGameOverlayEvent
+     * which fires reliably in ALL Forge 1.20.x versions regardless of
+     * whether the custom overlay registration succeeded.
+     * Fires every frame on ElementType.HOTBAR (which we also cancel in Pre
+     * via the new API, but Post still fires reliably here).
+     *
+     * The frame counter in render() prevents double-drawing if both
+     * the custom overlay AND this fallback fire in the same frame.
+     */
+    @SubscribeEvent
+    public void onRenderGameOverlayPost(net.minecraftforge.client.event.RenderGameOverlayEvent.Post event) {
+        if (event.getType() != net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType.HOTBAR) return;
+        render(event.getGuiGraphics());
+    }
+
+    /**
+     * Cancel vanilla hotbar in the OLD API too — belt and suspenders.
+     * If the new RenderGuiOverlayEvent.Pre handler doesn't fire for some
+     * reason, this ensures the vanilla hotbar is still hidden.
+     */
+    @SubscribeEvent
+    public void onRenderGameOverlayPre(net.minecraftforge.client.event.RenderGameOverlayEvent.Pre event) {
+        if (ClientState.getPhase() == GamePhase.LOBBY) return;
+        switch (event.getType()) {
+            case HOTBAR:
+            case PLAYER_HEALTH:
+            case FOOD:
+            case AIR:
+            case ARMOR:
+            case EXPERIENCE_BAR:
+            case JUMP_BAR:
+            case MOUNT_HEALTH:
+                event.setCanceled(true);
+                break;
+            default:
+                break;
+        }
     }
 
     private void drawHealthArmor(GuiGraphics g, int w, int h, Player p, Layout layout) {
