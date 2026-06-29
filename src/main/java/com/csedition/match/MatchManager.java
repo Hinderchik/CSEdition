@@ -406,7 +406,7 @@ public class MatchManager {
         if (isArmorId(gunId)) {
             applyArmor(player, gunId);
             sendMoneyUpdate(player, pd);
-            player.sendSystemMessage(Component.literal("Р вЂ™Р’В§a+" + armorPointsFor(gunId) + " armor"));
+            player.sendSystemMessage(Component.literal("§a+" + armorPointsFor(gunId) + " armor"));
             return;
         }
 
