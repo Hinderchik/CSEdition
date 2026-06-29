@@ -42,14 +42,25 @@ public class PlayerEvents {
 
     /**
      * Обработка убийств — начисление денег, проверка конца раунда.
+     * Также убираем броню (Netherite) из слотов, чтобы она НЕ выпала на землю.
+     * Очищаем ДО LivingDropsEvent — иначе броня попадёт в дроплист.
      */
     @SubscribeEvent
     public void onLivingDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer victim)) return;
+        // Удаляем броню из слотов — она не должна выпасть при смерти
+        var inv = victim.getInventory();
+        for (int i = 0; i < inv.armor.size(); i++) {
+            inv.armor.set(i, net.minecraft.world.item.ItemStack.EMPTY);
+        }
+        // Убираем модификатор брони чтобы при респавне не было лишних очков
+        var armorAttr = victim.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR);
+        if (armorAttr != null) {
+            armorAttr.removeModifier(java.util.UUID.fromString("9c5b6f1e-3a2d-4e8b-9f1c-7a8b9c0d1e2f"));
+        }
         if (event.getSource().getEntity() instanceof ServerPlayer killer) {
             MatchManager.getInstance().onPlayerKill(victim, killer);
         } else {
-            // Умер не от игрока — просто отметим как мёртвого
             MatchManager.getInstance().onPlayerKill(victim, null);
         }
     }
