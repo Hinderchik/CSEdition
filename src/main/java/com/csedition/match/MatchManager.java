@@ -57,6 +57,11 @@ public class MatchManager {
     private int roundNumber = 0;
     private boolean matchOver = false;
     private final Map<UUID, PlayerData> playerDataMap = new HashMap<>();
+    private final Map<Team, Integer> roundsWon = new java.util.EnumMap<>(Team.class);
+    {
+        roundsWon.put(Team.T, 0);
+        roundsWon.put(Team.CT, 0);
+    }
     private final Random random = new Random();
     private PacketPhaseUpdate cachedPhasePacket = null;
     private GamePhase lastBroadcastPhase = null;
@@ -109,6 +114,9 @@ public class MatchManager {
     }
     public int getPhaseTicks() { return phaseTicks; }
     public boolean isMatchOver() { return matchOver; }
+    public int getRoundsWon(com.csedition.data.Team team) {
+        return roundsWon.getOrDefault(team, 0);
+    }
 
     public void setCurrentMap(String mapId) {
         if (MapConfig.getMap(mapId) != null) {
@@ -263,6 +271,10 @@ public class MatchManager {
                 pd.onRoundWin(mode.getRoundWinReward());
             }
         }
+        // Track rounds won per team (for MR / CS-style match)
+        if (winner != null && roundsWon.containsKey(winner)) {
+            roundsWon.put(winner, roundsWon.get(winner) + 1);
+        }
 
         // Р В РЎСџР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’ВµР РЋР вЂљР В РЎвЂќР В Р’В° killsToWin Р Р†Р вЂљРІР‚Сњ Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂў-Р РЋРІР‚С™Р В РЎвЂў Р В Р вЂ¦Р В Р’В°Р В Р’В±Р РЋР вЂљР В Р’В°Р В Р’В» Р В Р вЂ¦Р РЋРЎвЂњР В Р’В¶Р В Р вЂ¦Р В РЎвЂўР В Р’Вµ Р РЋРІР‚РЋР В РЎвЂР РЋР С“Р В Р’В»Р В РЎвЂў Р В РЎвЂќР В РЎвЂР В Р’В»Р В Р’В»Р В РЎвЂўР В Р вЂ , Р В РЎВР В Р’В°Р РЋРІР‚С™Р РЋРІР‚РЋ Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦
         int killsToWin = CSConfig.getKillsToWin();
@@ -292,14 +304,37 @@ public class MatchManager {
             return;
         }
 
-        // Р В РЎвЂєР В Р’В±Р РЋРІР‚в„–Р РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂўР В Р’Вµ Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚РЋР В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ Р РЋР вЂљР В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р В РўвЂР В Р’В°
+        // Check CS-style MR: did the winning team reach roundsToWin?
+        int roundsToWin = CSConfig.getEffectiveRoundsToWin(mode.getRoundsToWin());
+        Team matchWinner = null;
+        if (winner == Team.T && roundsWon.get(Team.T) >= roundsToWin) matchWinner = Team.T;
+        else if (winner == Team.CT && roundsWon.get(Team.CT) >= roundsToWin) matchWinner = Team.CT;
+        if (matchWinner != null) {
+            matchOver = true;
+            String matchReason = "ROUNDS_WON";
+            broadcastRoundEnd(matchWinner, matchReason, roundNumber, -1);
+            for (UUID uuid : playerDataMap.keySet()) {
+                ServerPlayer sp = getServerPlayer(uuid);
+                if (sp != null) {
+                    sp.sendSystemMessage(Component.literal("=== MATCH OVER === " + matchWinner.name() + " wins! ("
+                            + roundsWon.get(Team.T) + "-" + roundsWon.get(Team.CT) + ", need " + roundsToWin + ")"));
+                    sendMoneyUpdate(sp, playerDataMap.get(uuid));
+                }
+            }
+            setPhase(GamePhase.ROUND_END);
+            scheduleMatchEndCleanup();
+            return;
+        }
+
+        // Continue to next round (announce with current score)
         String reasonText = switch (reason) {
             case "ELIMINATION" -> "All enemies eliminated";
             case "TIME_OUT" -> "Time ran out";
             default -> reason;
         };
         broadcastRoundEnd(winner, reason, roundNumber, -1);
-        Component msg = Component.literal("Round " + roundNumber + " won by " + (winner != null ? winner.name() : "DRAW") + " (" + reasonText + ")");
+        Component msg = Component.literal("Round " + roundNumber + " won by " + (winner != null ? winner.name() : "DRAW")
+                + " (" + reasonText + ") [" + roundsWon.get(Team.T) + "-" + roundsWon.get(Team.CT) + "/" + roundsToWin + "]");
         for (UUID uuid : playerDataMap.keySet()) {
             ServerPlayer sp = getServerPlayer(uuid);
             if (sp != null) {
@@ -349,6 +384,8 @@ public class MatchManager {
         }
         matchOver = false;
         roundNumber = 0;
+        roundsWon.put(Team.T, 0);
+        roundsWon.put(Team.CT, 0);
         setPhase(GamePhase.LOBBY);
     }
 

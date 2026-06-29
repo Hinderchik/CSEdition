@@ -107,6 +107,7 @@ public class CSHudOverlay {
         drawHealthArmor(g, w, h, mc.player, layout);
         drawMoney(g, w, h, layout);
         drawPhaseTimer(g, w, h, layout);
+        drawScoreboard(g, w, h);
         drawHotbar(g, w, h, mc.player, layout);
     }
 
@@ -173,6 +174,36 @@ public class CSHudOverlay {
             g.drawString(font, text, boxX + padX, boxY + layout.scale(5), CSRenderUtil.CS_GREEN);
             lastMoney = money;
         }
+    }
+
+    /**
+     * Scoreboard — T rounds won vs CT rounds won (out of roundsToWin).
+     * Shown top-center, below the phase timer.
+     */
+    private void drawScoreboard(GuiGraphics g, int w, int h) {
+        MatchManager mm = com.csedition.match.MatchManager.getInstance();
+        if (mm == null) return;
+        int tScore = mm.getRoundsWon(com.csedition.data.Team.T);
+        int ctScore = mm.getRoundsWon(com.csedition.data.Team.CT);
+        int target = mm.getCurrentMode().getRoundsToWin();
+        Font font = Minecraft.getInstance().font;
+        String text = "T " + tScore + " : " + ctScore + " CT  /  " + target;
+        int textW = font.width(text);
+        int cx = w / 2;
+        int y = 26; // just below the phase timer
+        // Фон
+        int bgX1 = cx - textW / 2 - 8;
+        int bgX2 = cx + textW / 2 + 8;
+        g.fill(bgX1, y, bgX2, y + 16, 0xCC000000);
+        // T score (orange/red), CT score (blue)
+        String tText = "T " + tScore;
+        String ctText = " CT";
+        g.drawString(font, tText, bgX1 + 4, y + 4, CSRenderUtil.CS_ORANGE);
+        int tW = font.width(tText);
+        g.drawString(font, " : ", bgX1 + 4 + tW, y + 4, 0xFFFFFFFF);
+        g.drawString(font, ctText, bgX1 + 4 + tW + font.width(" : "), y + 4, CSRenderUtil.CS_BLUE);
+        int leftW = font.width(tText) + font.width(" : ") + font.width(ctText);
+        g.drawString(font, "  /  " + target, bgX1 + 4 + leftW, y + 4, CSRenderUtil.CS_YELLOW);
     }
 
     private void drawPhaseTimer(GuiGraphics g, int w, int h, Layout layout) {

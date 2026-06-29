@@ -32,6 +32,7 @@ public class CSConfig {
 
     private static int maxInventorySlots = 3;
     private static int killsToWin = 10;
+    private static int roundsToWinOverride = 0; // 0 = use mode default
     private static boolean clearInventoryOnMatchEnd = true;
     private static final Set<String> keptItems = new HashSet<>();
     private static Path currentFile = null;
@@ -44,6 +45,7 @@ public class CSConfig {
 
     public static int getMaxInventorySlots() { return maxInventorySlots; }
     public static int getKillsToWin() { return killsToWin; }
+    public static int getRoundsToWinOverride() { return roundsToWinOverride; }
     public static boolean isClearInventoryOnMatchEnd() { return clearInventoryOnMatchEnd; }
     public static Set<String> getKeptItems() { return Collections.unmodifiableSet(keptItems); }
 
@@ -55,6 +57,21 @@ public class CSConfig {
     public static void setKillsToWin(int v) {
         killsToWin = Math.max(1, v);
         save();
+    }
+
+    /**
+     * Override rounds-to-win for the current match. 0 = use mode default.
+     */
+    public static void setRoundsToWinOverride(int v) {
+        roundsToWinOverride = Math.max(0, v);
+        save();
+    }
+
+    /**
+     * Effective rounds-to-win: override if set (>0), otherwise mode default.
+     */
+    public static int getEffectiveRoundsToWin(int modeDefault) {
+        return roundsToWinOverride > 0 ? roundsToWinOverride : modeDefault;
     }
 
     public static void setClearInventoryOnMatchEnd(boolean v) {

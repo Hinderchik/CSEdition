@@ -204,6 +204,9 @@ public class CSCommand {
                         .then(Commands.literal("kills")
                                 .then(Commands.argument("amount", IntegerArgumentType.integer())
                                         .executes(ctx -> configKills(ctx, IntegerArgumentType.getInteger(ctx, "amount")))))
+                        .then(Commands.literal("rounds")
+                                .then(Commands.argument("amount", IntegerArgumentType.integer(1, 30))
+                                        .executes(ctx -> configRounds(ctx, IntegerArgumentType.getInteger(ctx, "amount")))))
                         .then(Commands.literal("clearinv")
                                 .then(Commands.argument("value", StringArgumentType.string())
                                         .executes(ctx -> configClearInv(ctx, StringArgumentType.getString(ctx, "value")))))
@@ -764,6 +767,14 @@ public class CSCommand {
         return 1;
     }
 
+    private int configRounds(CommandContext<CommandSourceStack> ctx, int amount) {
+        CSConfig.setRoundsToWinOverride(amount);
+        int modeDefault = MatchManager.getInstance().getCurrentMode().getRoundsToWin();
+        ctx.getSource().sendSystemMessage(Component.literal(
+                "§aRounds to win set to: §e" + amount + " §7(mode default was " + modeDefault + ")"));
+        return 1;
+    }
+
     private int configClearInv(CommandContext<CommandSourceStack> ctx, String value) {
         boolean v = value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes") || value.equalsIgnoreCase("on");
         CSConfig.setClearInventoryOnMatchEnd(v);
@@ -795,6 +806,12 @@ public class CSCommand {
         ctx.getSource().sendSystemMessage(Component.literal("§6§l=== CS Config ==="));
         ctx.getSource().sendSystemMessage(Component.literal("§eMax inventory slots: §f" + CSConfig.getMaxInventorySlots()));
         ctx.getSource().sendSystemMessage(Component.literal("§eKills to win: §f" + CSConfig.getKillsToWin()));
+        int modeDefault = MatchManager.getInstance().getCurrentMode().getRoundsToWin();
+        int override = CSConfig.getRoundsToWinOverride();
+        String roundsStr = override > 0
+                ? "§f" + override + " §7(override, mode default " + modeDefault + ")"
+                : "§f" + modeDefault + " §7(mode default)";
+        ctx.getSource().sendSystemMessage(Component.literal("§eRounds to win: " + roundsStr));
         ctx.getSource().sendSystemMessage(Component.literal("§eClear inventory on match end: §f" + CSConfig.isClearInventoryOnMatchEnd()));
         ctx.getSource().sendSystemMessage(Component.literal("§eKept items: §f" + CSConfig.getKeptItems().size()));
         return 1;
