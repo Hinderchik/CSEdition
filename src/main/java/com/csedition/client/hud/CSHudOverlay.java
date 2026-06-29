@@ -74,7 +74,7 @@ public class CSHudOverlay {
      * A frame counter prevents double-rendering when both paths fire
      * in the same frame — only the first call draws.
      */
-    private long lastFrameDrawn = -1;
+    private float lastFrameDrawn = -1f;
 
     public void render(GuiGraphics g) {
         doRender(g);
@@ -96,7 +96,7 @@ public class CSHudOverlay {
         if (mc.options.hideGui) return;
 
         // Prevent double-render if both paths fire same frame
-        long frame = mc.getFrameTime(); // nanos
+        float frame = mc.getFrameTime(); // partial frame time
         if (frame == lastFrameDrawn) return;
         lastFrameDrawn = frame;
 
