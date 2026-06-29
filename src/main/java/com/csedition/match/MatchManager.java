@@ -481,10 +481,10 @@ public class MatchManager {
             // Then try to add Protection IV via registry lookup (safer than
             // relying on Enchantments.ALL_DAMAGE_PROTECTION which may not
             // be available in all Forge versions)
-            var enchHolder = net.minecraftforge.registries.ForgeRegistries.ENCHANTMENTS
-                    .getHolder(new net.minecraft.resources.ResourceLocation("minecraft:protection"));
-            if (enchHolder.isPresent()) {
-                armor.enchant(enchHolder.get(), 4);
+            var ench = net.minecraftforge.registries.ForgeRegistries.ENCHANTMENTS
+                    .getValue(new net.minecraft.resources.ResourceLocation("minecraft:protection"));
+            if (ench != null) {
+                armor.enchant(ench, 4);
             }
         }
     }
