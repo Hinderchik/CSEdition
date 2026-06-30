@@ -105,6 +105,19 @@ public class CSHudOverlay {
         INSTANCE.doRender(g);
     }
 
+    /**
+     * SECONDARY render path — draws in RenderGuiOverlayEvent.Pre of
+     * minecraft:chat. This overlay fires EVERY frame and we never cancel
+     * it, so this is the most reliable path. Pre fires before the overlay
+     * renders — our HUD is drawn onto the frame buffer first, then chat
+     * (just text) renders on top, but chat doesn't cover our HUD area.
+     */
+    @SubscribeEvent
+    public void onChatPre(RenderGuiOverlayEvent.Pre event) {
+        if (!"minecraft:chat".equals(event.getOverlay().id().toString())) return;
+        doRender(event.getGuiGraphics());
+    }
+
     private void doRender(GuiGraphics g) {
         if (ClientState.getPhase() == GamePhase.LOBBY) return;
         Minecraft mc = Minecraft.getInstance();
