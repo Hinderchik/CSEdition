@@ -57,6 +57,11 @@ public class MatchManager {
     private int roundNumber = 0;
     private boolean matchOver = false;
     private final Map<UUID, PlayerData> playerDataMap = new HashMap<>();
+    private final Map<Team, Integer> roundsWon = new java.util.EnumMap<>(Team.class);
+    {
+        roundsWon.put(Team.T, 0);
+        roundsWon.put(Team.CT, 0);
+    }
     private final Random random = new Random();
     private PacketPhaseUpdate cachedPhasePacket = null;
     private GamePhase lastBroadcastPhase = null;
@@ -109,6 +114,9 @@ public class MatchManager {
     }
     public int getPhaseTicks() { return phaseTicks; }
     public boolean isMatchOver() { return matchOver; }
+    public int getRoundsWon(Team team) {
+        return roundsWon.getOrDefault(team, 0);
+    }
 
     public void setCurrentMap(String mapId) {
         if (MapConfig.getMap(mapId) != null) {
@@ -338,6 +346,8 @@ public class MatchManager {
         }
         matchOver = false;
         roundNumber = 0;
+        roundsWon.put(Team.T, 0);
+        roundsWon.put(Team.CT, 0);
         setPhase(GamePhase.LOBBY);
     }
 

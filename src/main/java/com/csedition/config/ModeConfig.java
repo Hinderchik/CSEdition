@@ -157,6 +157,7 @@ public final class ModeConfig {
         int roundWin = obj.has("roundWinReward") ? obj.get("roundWinReward").getAsInt() : 3000;
         int buyTime = obj.has("buyTimeSeconds") ? obj.get("buyTimeSeconds").getAsInt() : 15;
         int roundTime = obj.has("roundTimeSeconds") ? obj.get("roundTimeSeconds").getAsInt() : 120;
+        int roundsToWin = obj.has("roundsToWin") ? obj.get("roundsToWin").getAsInt() : 8;
         boolean respawn = obj.has("respawn") && obj.get("respawn").getAsBoolean();
         boolean allowBuy = !obj.has("allowBuy") || obj.get("allowBuy").getAsBoolean();
         List<String> tW = new ArrayList<>();
@@ -168,7 +169,7 @@ public final class ModeConfig {
             for (JsonElement e : obj.getAsJsonArray("startWeaponsCT")) ctW.add(e.getAsString());
         }
         return new GameMode(id, name, desc, startMoney, killReward, roundWin,
-                buyTime, roundTime, respawn, allowBuy, tW, ctW, false);
+                buyTime, roundTime, roundsToWin, respawn, allowBuy, tW, ctW, false);
     }
 
     /**
