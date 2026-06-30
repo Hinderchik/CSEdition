@@ -72,10 +72,11 @@ public class CSHudOverlay {
      * (registered via RegisterGuiOverlaysEvent) AND by the mixin
      * fallback (MixinGui renders at end of Gui.render).
      *
-     * A frame counter prevents double-rendering when both paths fire
-     * in the same frame — only the first call draws.
+     * Previously had a frame counter using getFrameTime() to prevent
+     * double-rendering, but that returned the SAME value for consecutive
+     * frames at stable framerates — causing the HUD to NEVER render.
+     * Removed: just render every call. Double-render is harmless.
      */
-    private float lastFrameDrawn = -1f;
 
     public void render(GuiGraphics g) {
         doRender(g);
@@ -96,10 +97,8 @@ public class CSHudOverlay {
         if (mc.player == null || mc.level == null) return;
         if (mc.options.hideGui) return;
 
-        // Prevent double-render if both paths fire same frame
-        float frame = mc.getFrameTime(); // partial frame time
-        if (frame == lastFrameDrawn) return;
-        lastFrameDrawn = frame;
+        // Frame counter removed — it was blocking rendering because
+        // getFrameTime() returns the same value for consecutive frames.
 
         int w = mc.getWindow().getGuiScaledWidth();
         int h = mc.getWindow().getGuiScaledHeight();
