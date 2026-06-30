@@ -73,14 +73,17 @@ public class GameMode {
 
     /**
      * Создаёт встроенный режим CLASSIC — стандартный CS, 8 раундов до победы.
+     * Стартовое оружие: только пистолет. Ножи НЕ выдаются — игрок стартует
+     * с пустыми руками и может использовать нож из других модов (MCS2 и т.д.)
+     * или играть кулаками.
      */
     public static GameMode classic() {
         return new GameMode("classic", "Classic",
-                "Standard CS rules: pistol + knife, buy in BUY_TIME",
+                "Standard CS rules: pistol only, buy in BUY_TIME",
                 800, 300, 3000, 15, 120, 8,
                 false, true,
-                List.of("tacz:glock_17", "tacz:combat_knife"),
-                List.of("tacz:usp_45", "tacz:combat_knife"),
+                List.of("tacz:glock_17"),
+                List.of("tacz:usp_45"),
                 true);
     }
 
@@ -118,8 +121,8 @@ public class GameMode {
                 "Only pistols allowed",
                 800, 300, 3000, 15, 120, 8,
                 false, true,
-                List.of("tacz:glock_17", "tacz:combat_knife"),
-                List.of("tacz:usp_45", "tacz:combat_knife"),
+                List.of("tacz:glock_17"),
+                List.of("tacz:usp_45"),
                 true);
     }
 }

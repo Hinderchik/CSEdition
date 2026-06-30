@@ -42,8 +42,9 @@ public class PlayerEvents {
 
     /**
      * Обработка убийств — начисление денег, проверка конца раунда.
-     * Также убираем броню (Netherite) из слотов, чтобы она НЕ выпала на землю.
-     * Очищаем ДО LivingDropsEvent — иначе броня попадёт в дроплист.
+     * Также убираем броню (Netherite) из слотов и оружие из инвентаря,
+     * чтобы они НЕ выпали на землю. Нож в KNIFE_SLOT остаётся.
+     * Очищаем ДО LivingDropsEvent — иначе предметы попадут в дроплист.
      */
     @SubscribeEvent
     public void onLivingDeath(LivingDeathEvent event) {
@@ -52,6 +53,15 @@ public class PlayerEvents {
         var inv = victim.getInventory();
         for (int i = 0; i < inv.armor.size(); i++) {
             inv.armor.set(i, net.minecraft.world.item.ItemStack.EMPTY);
+        }
+        // Очищаем основной инвентарь кроме слота с ножом (KNIFE_SLOT)
+        // чтобы при респавне не было лишнего оружия на земле
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            if (i == com.csedition.match.MatchManager.KNIFE_SLOT) continue;
+            ItemStack stack = inv.getItem(i);
+            if (!stack.isEmpty()) {
+                inv.setItem(i, ItemStack.EMPTY);
+            }
         }
         // Убираем модификатор брони чтобы при респавне не было лишних очков
         var armorAttr = victim.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR);

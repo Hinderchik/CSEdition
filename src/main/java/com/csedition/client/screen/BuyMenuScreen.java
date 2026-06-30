@@ -43,6 +43,9 @@ public class BuyMenuScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        // Для отрисовки тултипов в конце
+        String hoveredTooltip = null;
+        int hoveredTx = 0, hoveredTy = 0;
         // Тёмный фон со сканлайнами
         g.fill(0, 0, this.width, this.height, 0xDD050505);
         CSRenderUtil.scanlines(g, 0, 0, this.width, this.height, 3);
@@ -104,6 +107,16 @@ public class BuyMenuScreen extends Screen {
                 int priceW = font.width(priceStr);
                 g.drawString(font, priceStr, slotX + (SLOT - priceW) / 2, slotY + SLOT - 10, priceColor);
 
+                // Тултип для брони
+                if (hovered) {
+                    String tip = getTooltipForItem(gunId);
+                    if (tip != null) {
+                        hoveredTooltip = tip;
+                        hoveredTx = slotX;
+                        hoveredTy = slotY + SLOT + 2;
+                    }
+                }
+
                 slotX += SLOT + PADDING;
             }
 
@@ -113,6 +126,30 @@ public class BuyMenuScreen extends Screen {
         // Подсказка
         g.drawCenteredString(font, "ESC — закрыть  |  Z=последнее  X=автомат  C=пистолет  4=снаряжение",
                 this.width / 2, this.height - 16, 0xFF888888);
+
+        // Тултип на наведённом слоте (рисуется последним поверх всего)
+        if (hoveredTooltip != null) {
+            int tw = font.width(hoveredTooltip) + 8;
+            int th = 14;
+            int tx = hoveredTx;
+            int ty = hoveredTy;
+            g.fill(tx - 2, ty - 2, tx + tw, ty + th, 0xEE000000);
+            g.fill(tx - 2, ty - 2, tx + tw - 2, ty - 1, CSRenderUtil.CS_ORANGE);
+            g.drawString(font, hoveredTooltip, tx + 2, ty + 2, 0xFFFFFFFF);
+        }
+    }
+
+    /**
+     * Тултип для конкретного предмета. Возвращает null если тултип не нужен.
+     */
+    private String getTooltipForItem(String gunId) {
+        if ("tacz:kevlar".equals(gunId)) {
+            return "Netherite Chestplate + Prot IV";
+        }
+        if ("tacz:helmet".equals(gunId)) {
+            return "Netherite Helmet + Prot IV";
+        }
+        return null;
     }
 
     @Override
