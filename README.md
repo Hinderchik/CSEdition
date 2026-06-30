@@ -1,5 +1,8 @@
 # CS Edition — Руководство для друга
 
+[![Build](https://github.com/Hinderchik/mods/actions/workflows/build.yml/badge.svg)](https://github.com/Hinderchik/mods/actions/workflows/build.yml)
+[![Latest Release](https://img.shields.io/github/v/tag/Hinderchik/mods?label=version&sort=semver)](https://github.com/Hinderchik/mods/releases)
+
 ## Что это?
 
 CS Edition — мод для Minecraft 1.20.1 (Forge), который добавляет режим Counter-Strike:
