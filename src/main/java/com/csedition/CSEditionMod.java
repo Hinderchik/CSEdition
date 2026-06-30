@@ -50,11 +50,14 @@ public class CSEditionMod {
         if (FMLEnvironment.dist == Dist.CLIENT) {
             // HUD uses RenderGuiOverlayEvent.Pre on minecraft:chat
             // (works with OptiFine, Embeddium, Sodium, vanilla).
-            // Constructor self-registers on MinecraftForge.EVENT_BUS.
             com.csedition.client.hud.CSHudOverlay hudOverlay =
                     com.csedition.client.hud.CSHudOverlay.getInstance();
             MinecraftForge.EVENT_BUS.register(new com.csedition.client.input.InputHandler());
             modBus.addListener(com.csedition.client.keybind.KeyBindings::onRegister);
+
+            // Check for mod updates on GitHub every 30 minutes
+            com.csedition.client.VersionChecker.start();
+
             LOGGER.info("[CS-Edition] Client setup complete.");
         }
     }
