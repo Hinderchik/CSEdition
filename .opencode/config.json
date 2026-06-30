@@ -10,9 +10,17 @@
       ],
       "environment": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_PERSONAL_ACCESS_TOKEN}",
-        "GITHUB_REPOSITORY": "Hinderchik/mods"
+        "GITHUB_REPOSITORY": "Hinderchik/CSEdition"
       },
       "enabled": true
     }
-  }
+  },
+  "instructions": [
+    "CS Edition mod for Minecraft 1.20.1 Forge",
+    "Repo: Hinderchik/CSEdition (renamed from Hinderchik/mods)",
+    "After push, check GitHub Actions build status via MCP",
+    "HUD uses RenderGuiOverlayEvent.Pre on minecraft:chat (Embeddium/Sodium safe)",
+    "Knife slot 3 (index) is protected - KNIFE_SLOT in MatchManager",
+    "VersionChecker auto-notifies player in chat when new GitHub release is available"
+  ]
 }
