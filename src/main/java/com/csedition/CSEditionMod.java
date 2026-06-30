@@ -1,6 +1,5 @@
 package com.csedition;
 
-import com.csedition.config.MapConfig;
 import com.csedition.match.MatchManager;
 import com.csedition.network.CSPackets;
 import net.minecraftforge.api.distmarker.Dist;
@@ -37,8 +36,6 @@ public class CSEditionMod {
                 new net.minecraftforge.common.ForgeConfigSpec.Builder().build(),
                 "csedition-common.toml");
 
-        // MapConfig.load() РІС‹Р·С‹РІР°РµС‚СЃСЏ РІ ServerEvents.onServerStarted,
-        // РєРѕРіРґР° РјРёСЂ СѓР¶Рµ РґРѕСЃС‚СѓРїРµРЅ (РЅСѓР¶РµРЅ РїСѓС‚СЊ Рє РїР°РїРєРµ РјРёСЂР°)
         LOGGER.info("[CS-Edition] Mod initialized.");
     }
 
@@ -51,22 +48,13 @@ public class CSEditionMod {
 
     private void clientSetup(final FMLClientSetupEvent event) {
         if (FMLEnvironment.dist == Dist.CLIENT) {
-            // CSHudOverlay — отдельный инстанс, чтобы Pre-cancel и custom overlay
-            // рендер использовали одно и то же состояние кэшей.
+            // HUD uses RenderGuiOverlayEvent.Pre on minecraft:chat
+            // (works with OptiFine, Embeddium, Sodium, vanilla).
+            // Constructor self-registers on MinecraftForge.EVENT_BUS.
             com.csedition.client.hud.CSHudOverlay hudOverlay =
-                    new com.csedition.client.hud.CSHudOverlay();
-            MinecraftForge.EVENT_BUS.register(hudOverlay);
+                    com.csedition.client.hud.CSHudOverlay.getInstance();
             MinecraftForge.EVENT_BUS.register(new com.csedition.client.input.InputHandler());
             modBus.addListener(com.csedition.client.keybind.KeyBindings::onRegister);
-            // Кастомный overlay — единственный надёжный способ рисовать HUD ровно
-            // 1 раз/кадр. Post-событие minecraft:hotbar не стреляет, когда Pre
-            // отменён (overlay пропускается целиком).
-            modBus.addListener((net.minecraftforge.client.event.RegisterGuiOverlaysEvent ev) -> {
-                ev.registerAbove(
-                        net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.HOTBAR.id(),
-                        "csedition_hud",
-                        (gui, g, partialTick, sw, sh) -> hudOverlay.render(g));
-            });
             LOGGER.info("[CS-Edition] Client setup complete.");
         }
     }

@@ -3,6 +3,7 @@ package com.csedition.client.hud;
 import com.csedition.client.ClientState;
 import com.csedition.client.render.CSRenderUtil;
 import com.csedition.data.GamePhase;
+import com.csedition.data.Team;
 import com.csedition.match.MatchManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -15,18 +16,20 @@ import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 /**
- * Кастомный HUD в стиле CS Mobile / BLOCKPOST mobile.
+ * Custom HUD drawn in RenderGuiOverlayEvent.Pre of minecraft:chat.
  *
- * Хотбар — ВЕРТИКАЛЬНЫЙ, 3 слота, справа снизу (как мобильный FPS).
+ * Why this works everywhere (OptiFine, Embeddium, Sodium, vanilla):
+ *  - minecraft:chat overlay is ALWAYS rendered every frame
+ *  - We never cancel it (only hotbar/health/food/etc. are cancelled)
+ *  - Pre fires before chat renders, so our HUD draws onto frame buffer first
+ *  - Chat text is small and doesn't overlap our HUD areas
  *
- * Оптимизация FPS:
- *   1. Рисуем только в Post одного конкретного overlay (minecraft:hotbar) —
- *      это гарантирует ровно 1 draw/кадр без агрессивного millis-дедупа.
- *   2. Кэш значений HP/AP/money/фазы — пропускаем fill и текст если не изменились.
- *   3. Используем fill вместо gradient где возможно (Tesselator дорогой).
- *   4. Никаких outline для не-выбранных слотов — только выбранный с рамкой.
- *   5. renderItem вызывается каждый кадр (кэш renderItem сломан: каждый кадр
- *      frame buffer очищается, skip = предмет исчезает).
+ * Layout (screen-space):
+ *  - HP/AP bars: bottom-left
+ *  - Money: top-right
+ *  - Phase timer: top-center
+ *  - Scoreboard: below phase timer
+ *  - Hotbar: right side, vertical 3 slots
  */
 @OnlyIn(Dist.CLIENT)
 public class CSHudOverlay {
@@ -36,204 +39,124 @@ public class CSHudOverlay {
     private static final int HOTBAR_SLOTS = 3;
     private static final int SLOT_GAP = 4;
 
-    /** Кэш значений — пропускаем перерисовку блоков если не изменились. */
-    private float lastHealthRatio = -1f;
-    private int lastArmorValue = -1;
+    // Caches — only used to skip text redraws when value unchanged
     private int lastHpInt = -1;
+    private int lastArmor = -1;
     private int lastMoney = Integer.MIN_VALUE;
     private int lastPhaseTicks = Integer.MIN_VALUE;
     private GamePhase lastPhase = null;
 
-    /** Кэш количества предметов в слоте — пропускаем только текст числа. */
-    private final int[] lastItemCount = new int[HOTBAR_SLOTS];
+    public CSHudOverlay() {
+        // Register on MinecraftForge.EVENT_BUS for the overlay event
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(this);
+    }
+
+    public static CSHudOverlay getInstance() {
+        return INSTANCE;
+    }
 
     @SubscribeEvent
-    public void onRenderOverlay(RenderGuiOverlayEvent.Pre event) {
-        if (ClientState.getPhase() == GamePhase.LOBBY) return;
-        String id = event.getOverlay().id().toString();
-        switch (id) {
-            case "minecraft:player_health":
-            case "minecraft:food_level":
-            case "minecraft:air_level":
-            case "minecraft:armor_level":
-            case "minecraft:hotbar":
-            case "minecraft:experience_bar":
-            case "minecraft:jump_bar":
-            case "minecraft:mount_health":
-                event.setCanceled(true);
-                break;
-            default:
-                break;
-        }
-    }
-
-    /**
-     * Direct render path — draws our HUD in the Pre event of the hotbar
-     * overlay (which we cancel anyway). This fires BEFORE the overlay
-     * renders, so our HUD draws onto the frame buffer first.
-     *
-     * This is the PRIMARY render path now since mixins and custom overlays
-     * have proven unreliable across Forge 1.20.x patch versions.
-     */
-    @SubscribeEvent
-    public void onRenderOverlayPost(RenderGuiOverlayEvent.Post event) {
-        if (!"minecraft:hotbar".equals(event.getOverlay().id().toString())) return;
-        doRender(event.getGuiGraphics());
-    }
-
-    /**
-     * Public render method called by the custom overlay
-     * (registered via RegisterGuiOverlaysEvent) AND by the mixin
-     * fallback (MixinGui renders at end of Gui.render).
-     *
-     * Previously had a frame counter using getFrameTime() to prevent
-     * double-rendering, but that returned the SAME value for consecutive
-     * frames at stable framerates — causing the HUD to NEVER render.
-     * Removed: just render every call. Double-render is harmless.
-     */
-
-    public void render(GuiGraphics g) {
-        doRender(g);
-    }
-
-    /**
-     * Static entry point for MixinGui. Delegates to the singleton instance.
-     * The mixin can't easily hold a reference to our instance, so we
-     * expose a static method backed by INSTANCE.
-     */
-    public static void drawHud(GuiGraphics g) {
-        INSTANCE.doRender(g);
-    }
-
-    /**
-     * SECONDARY render path — draws in RenderGuiOverlayEvent.Pre of
-     * minecraft:chat. This overlay fires EVERY frame and we never cancel
-     * it, so this is the most reliable path. Pre fires before the overlay
-     * renders — our HUD is drawn onto the frame buffer first, then chat
-     * (just text) renders on top, but chat doesn't cover our HUD area.
-     */
-    @SubscribeEvent
-    public void onChatPre(RenderGuiOverlayEvent.Pre event) {
+    public void onChatOverlayPre(RenderGuiOverlayEvent.Pre event) {
         if (!"minecraft:chat".equals(event.getOverlay().id().toString())) return;
+        if (!shouldRender()) return;
         doRender(event.getGuiGraphics());
+    }
+
+    private boolean shouldRender() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) return false;
+        if (mc.options.hideGui) return false;
+        if (mc.screen != null && !(mc.screen instanceof net.minecraft.client.gui.screens.ChatScreen)) {
+            return false;
+        }
+        return ClientState.getPhase() != GamePhase.LOBBY;
     }
 
     private void doRender(GuiGraphics g) {
-        if (ClientState.getPhase() == GamePhase.LOBBY) return;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
-        if (mc.options.hideGui) return;
-
-        // Frame counter removed — it was blocking rendering because
-        // getFrameTime() returns the same value for consecutive frames.
-
+        Player p = mc.player;
         int w = mc.getWindow().getGuiScaledWidth();
         int h = mc.getWindow().getGuiScaledHeight();
-        Layout layout = Layout.forScreen(w, h);
 
-        drawHealthArmor(g, w, h, mc.player, layout);
-        drawMoney(g, w, h, layout);
-        drawPhaseTimer(g, w, h, layout);
-        drawScoreboard(g, w, h);
-        drawHotbar(g, w, h, mc.player, layout);
+        drawHealthArmor(g, p, h);
+        drawMoney(g, w);
+        drawPhaseTimer(g, w);
+        drawScoreboard(g, w);
+        drawHotbar(g, p, w, h);
     }
 
-    private void drawHealthArmor(GuiGraphics g, int w, int h, Player p, Layout layout) {
+    // ====================== HP / AP bars ======================
+
+    private void drawHealthArmor(GuiGraphics g, Player p, int screenH) {
         Font font = Minecraft.getInstance().font;
-        int x = layout.padLeft;
-        int barW = layout.hpBarW;
-        int barH = layout.hpBarH;
+        int barW = Math.max(120, mcScale(90));
+        int barH = Math.max(4, mcScale(3));
+        int x = mcScale(8);
+        int hpY = screenH - mcScale(48);
 
-        float maxHp = p.getMaxHealth();
-        float health = p.getHealth();
-        float healthRatio = maxHp > 0 ? Math.max(0, health / maxHp) : 0;
+        float maxHp = Math.max(1f, p.getMaxHealth());
+        float health = Math.max(0f, p.getHealth());
+        float hpRatio = Math.min(1f, health / maxHp);
         int armor = p.getArmorValue();
-        float armorRatio = armor > 0 ? Math.min(1f, armor / 20f) : 0;
+        float apRatio = Math.min(1f, armor / 20f);
 
-        // Фон и заливка рисуем КАЖДЫЙ кадр (frame buffer очищается каждый кадр).
-        // Кэш только для текста — текст "20" / "15" не меняется каждый кадр.
-        drawCsBar(g, x, layout.hpY, barW, barH, healthRatio, CSRenderUtil.CS_RED, "HP");
-        drawCsBar(g, x, layout.apY, barW, barH, armorRatio, CSRenderUtil.CS_BLUE, "AP");
-
+        // HP bar
+        g.fill(x - 1, hpY - 1, x + barW + 1, hpY + barH + 1, 0xFF000000);
+        g.fill(x, hpY, x + barW, hpY + barH, 0xFF1A0A0A);
+        int hpFill = (int) (barW * hpRatio);
+        if (hpFill > 0) g.fill(x, hpY, x + hpFill, hpY + barH, CSRenderUtil.CS_RED);
+        // segment ticks
+        for (int i = 1; i < 4; i++) {
+            int sx = x + (barW * i / 4);
+            g.fill(sx, hpY, sx + 1, hpY + barH, 0x66000000);
+        }
+        g.drawString(font, "HP", x, hpY - 9, CSRenderUtil.CS_RED);
         int hpInt = (int) health;
         if (hpInt != lastHpInt) {
-            g.drawString(font, String.valueOf(hpInt), x + barW + 4, layout.hpY, 0xFFFFFFFF);
+            g.drawString(font, String.valueOf(hpInt), x + barW + 4, hpY, 0xFFFFFFFF);
             lastHpInt = hpInt;
         }
-        if (armor != lastArmorValue) {
-            g.drawString(font, String.valueOf(armor), x + barW + 4, layout.apY, 0xFFFFFFFF);
-            lastArmorValue = armor;
-        }
-    }
 
-    private void drawCsBar(GuiGraphics g, int x, int y, int w, int h,
-                           float ratio, int color, String label) {
-        ratio = Math.max(0, Math.min(1, ratio));
-        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF000000);
-        g.fill(x, y, x + w, y + h, 0xFF1A0A0A);
-        int fillW = (int) (w * ratio);
-        if (fillW > 0) {
-            g.fill(x, y, x + fillW, y + h, color);
-        }
+        // AP bar
+        int apY = hpY + barH + mcScale(6);
+        g.fill(x - 1, apY - 1, x + barW + 1, apY + barH + 1, 0xFF000000);
+        g.fill(x, apY, x + barW, apY + barH, 0xFF1A0A0A);
+        int apFill = (int) (barW * apRatio);
+        if (apFill > 0) g.fill(x, apY, x + apFill, apY + barH, CSRenderUtil.CS_BLUE);
         for (int i = 1; i < 4; i++) {
-            int sx = x + (w * i / 4);
-            g.fill(sx, y, sx + 1, y + h, 0x66000000);
+            int sx = x + (barW * i / 4);
+            g.fill(sx, apY, sx + 1, apY + barH, 0x66000000);
         }
-        g.drawString(Minecraft.getInstance().font, label, x, y - 9, color);
+        g.drawString(font, "AP", x, apY - 9, CSRenderUtil.CS_BLUE);
+        if (armor != lastArmor) {
+            g.drawString(font, String.valueOf(armor), x + barW + 4, apY, 0xFFFFFFFF);
+            lastArmor = armor;
+        }
     }
 
-    private void drawMoney(GuiGraphics g, int w, int h, Layout layout) {
+    // ====================== Money ======================
+
+    private void drawMoney(GuiGraphics g, int screenW) {
         int money = ClientState.getMoney();
         Font font = Minecraft.getInstance().font;
         String text = "$" + money;
-        int padX = layout.scale(8);
-        int boxY = layout.scale(8);
-        int boxH = layout.scale(18);
+        int padX = mcScale(8);
+        int boxH = mcScale(18);
         int textW = font.width(text);
-        int boxX = w - textW - padX * 2 - layout.scale(8);
+        int boxX = screenW - textW - padX * 2 - mcScale(8);
+        int boxY = mcScale(8);
 
-        // Фон рисуем КАЖДЫЙ кадр (frame buffer очищается).
-        // Текст — только при изменении суммы.
         g.fill(boxX, boxY, boxX + textW + padX * 2, boxY + boxH, 0xCC000000);
         g.fill(boxX, boxY, boxX + 2, boxY + boxH, CSRenderUtil.CS_ORANGE);
-
         if (money != lastMoney) {
-            g.drawString(font, text, boxX + padX, boxY + layout.scale(5), CSRenderUtil.CS_GREEN);
+            g.drawString(font, text, boxX + padX, boxY + mcScale(5), CSRenderUtil.CS_GREEN);
             lastMoney = money;
         }
     }
 
-    /**
-     * Scoreboard — T rounds won vs CT rounds won (out of roundsToWin).
-     * Shown top-center, below the phase timer.
-     */
-    private void drawScoreboard(GuiGraphics g, int w, int h) {
-        MatchManager mm = com.csedition.match.MatchManager.getInstance();
-        if (mm == null) return;
-        int tScore = mm.getRoundsWon(com.csedition.data.Team.T);
-        int ctScore = mm.getRoundsWon(com.csedition.data.Team.CT);
-        int target = mm.getCurrentMode().getRoundsToWin();
-        Font font = Minecraft.getInstance().font;
-        String text = "T " + tScore + " : " + ctScore + " CT  /  " + target;
-        int textW = font.width(text);
-        int cx = w / 2;
-        int y = 26; // just below the phase timer
-        // Фон
-        int bgX1 = cx - textW / 2 - 8;
-        int bgX2 = cx + textW / 2 + 8;
-        g.fill(bgX1, y, bgX2, y + 16, 0xCC000000);
-        // T score (orange/red), CT score (blue)
-        String tText = "T " + tScore;
-        String ctText = " CT";
-        g.drawString(font, tText, bgX1 + 4, y + 4, CSRenderUtil.CS_ORANGE);
-        int tW = font.width(tText);
-        g.drawString(font, " : ", bgX1 + 4 + tW, y + 4, 0xFFFFFFFF);
-        g.drawString(font, ctText, bgX1 + 4 + tW + font.width(" : "), y + 4, CSRenderUtil.CS_BLUE);
-        int leftW = font.width(tText) + font.width(" : ") + font.width(ctText);
-        g.drawString(font, "  /  " + target, bgX1 + 4 + leftW, y + 4, CSRenderUtil.CS_YELLOW);
-    }
+    // ====================== Phase timer ======================
 
-    private void drawPhaseTimer(GuiGraphics g, int w, int h, Layout layout) {
+    private void drawPhaseTimer(GuiGraphics g, int screenW) {
         GamePhase phase = ClientState.getPhase();
         int ticks = ClientState.getPhaseTicks();
         Font font = Minecraft.getInstance().font;
@@ -245,54 +168,73 @@ public class CSHudOverlay {
         };
         String text = phaseName + "  " + (ticks / 20) + "с";
         int textW = font.width(text);
-        int cx = w / 2;
-        int bgY2 = layout.scale(22);
-        int bgY1 = layout.scale(4);
-        int padX = layout.scale(10);
+        int cx = screenW / 2;
+        int bgY2 = mcScale(22);
+        int bgY1 = mcScale(4);
+        int padX = mcScale(10);
 
         int bgX1 = cx - textW / 2 - padX;
         int bgX2 = cx + textW / 2 + padX;
 
-        // Фон рисуем КАЖДЫЙ кадр (frame buffer очищается).
-        // Текст (фаза + секунды) — только при изменении значений.
         g.fill(bgX1, bgY1, bgX2, bgY2, 0xCC000000);
         g.fill(bgX1, bgY2 - 4, bgX2, bgY2 - 3, CSRenderUtil.CS_ORANGE);
 
         if (phase != lastPhase || ticks != lastPhaseTicks) {
-            // Затираем старый текст перед рисованием нового (на случай изменения длины)
             g.fill(bgX1 + 1, bgY1 + 1, bgX2 - 1, bgY2 - 5, 0xCC000000);
-            g.drawString(font, text, cx - textW / 2, layout.scale(9), CSRenderUtil.CS_YELLOW);
+            g.drawString(font, text, cx - textW / 2, bgY1 + mcScale(5), CSRenderUtil.CS_YELLOW);
             lastPhase = phase;
             lastPhaseTicks = ticks;
         }
     }
 
-    /**
-     * ВЕРТИКАЛЬНЫЙ хотбар — 3 слота столбиком, справа снизу.
-     * Фон, рамка и предмет рисуются КАЖДЫЙ кадр (кэш renderItem сломан —
-     * frame buffer очищается каждый кадр, skip = предмет исчезает).
-     * Кэшируем только текст количества, если оно не изменилось.
-     */
-    private void drawHotbar(GuiGraphics g, int w, int h, Player p, Layout layout) {
+    // ====================== Scoreboard ======================
+
+    private void drawScoreboard(GuiGraphics g, int screenW) {
+        MatchManager mm = MatchManager.getInstance();
+        if (mm == null) return;
+        int tScore = mm.getRoundsWon(Team.T);
+        int ctScore = mm.getRoundsWon(Team.CT);
+        int target = mm.getCurrentMode().getRoundsToWin();
         Font font = Minecraft.getInstance().font;
-        int slotSize = layout.slotSize;
-        int slotGap = SLOT_GAP;
-        int totalH = HOTBAR_SLOTS * slotSize + (HOTBAR_SLOTS - 1) * slotGap;
-        int hotbarX = w - slotSize - layout.scale(8);
-        int hotbarY = h - totalH - layout.scale(8);
+        int cx = screenW / 2;
+        int y = mcScale(28);
+
+        String tText = "T " + tScore;
+        String ctText = "CT";
+        int tW = font.width(tText);
+        int colonW = font.width(" : ");
+        int ctW = font.width(ctText);
+        int slashW = font.width(" / " + target);
+        int totalW = tW + colonW + ctW + slashW;
+        int bgX1 = cx - totalW / 2 - 6;
+        int bgX2 = cx + totalW / 2 + 6;
+
+        g.fill(bgX1, y, bgX2, y + mcScale(14), 0xCC000000);
+        g.drawString(font, tText, bgX1 + 4, y + 3, CSRenderUtil.CS_ORANGE);
+        g.drawString(font, " : ", bgX1 + 4 + tW, y + 3, 0xFFFFFFFF);
+        g.drawString(font, ctText, bgX1 + 4 + tW + colonW, y + 3, CSRenderUtil.CS_BLUE);
+        g.drawString(font, " / " + target, bgX1 + 4 + tW + colonW + ctW, y + 3, CSRenderUtil.CS_YELLOW);
+    }
+
+    // ====================== Vertical hotbar ======================
+
+    private void drawHotbar(GuiGraphics g, Player p, int screenW, int screenH) {
+        Font font = Minecraft.getInstance().font;
+        int slotSize = Math.max(28, mcScale(14));
+        int totalH = HOTBAR_SLOTS * slotSize + (HOTBAR_SLOTS - 1) * SLOT_GAP;
+        int hotbarX = screenW - slotSize - mcScale(8);
+        int hotbarY = screenH - totalH - mcScale(8);
 
         int selected = p.getInventory().selected;
 
         for (int i = 0; i < HOTBAR_SLOTS; i++) {
-            int slotY = hotbarY + i * (slotSize + slotGap);
+            int slotY = hotbarY + i * (slotSize + SLOT_GAP);
             ItemStack stack = p.getInventory().getItem(i);
             boolean isSelected = (i == selected);
 
-            // Фон слота — каждый кадр (frame buffer очищается)
             int bgColor = isSelected ? 0xEE3A2A1A : 0xEE0E0E0E;
             g.fill(hotbarX, slotY, hotbarX + slotSize, slotY + slotSize, bgColor);
 
-            // Рамка — каждый кадр
             if (isSelected) {
                 g.renderOutline(hotbarX, slotY, slotSize, slotSize, CSRenderUtil.CS_ORANGE);
             } else {
@@ -303,23 +245,19 @@ public class CSHudOverlay {
                 g.fill(hotbarX + slotSize - 1, slotY, hotbarX + slotSize, slotY + slotSize, border);
             }
 
-            // Предмет — каждый кадр, БЕЗ кэша
             if (!stack.isEmpty()) {
                 int itemX = hotbarX + (slotSize - 16) / 2;
                 int itemY = slotY + (slotSize - 16) / 2;
                 g.renderItem(stack, itemX, itemY);
+                if (stack.getCount() > 1) {
+                    String count = String.valueOf(stack.getCount());
+                    g.drawString(font, count,
+                            hotbarX + slotSize - font.width(count) - 2,
+                            slotY + slotSize - 8,
+                            0xFFFFFFFF);
+                }
             }
 
-            // Количество — каждый кадр, БЕЗ кэша (дёшево, string уже в Font кэше)
-            if (stack.getCount() > 1) {
-                String count = String.valueOf(stack.getCount());
-                g.drawString(font, count,
-                        hotbarX + slotSize - font.width(count) - 2,
-                        slotY + slotSize - 8,
-                        0xFFFFFFFF);
-            }
-
-            // Номер слота — каждый кадр
             String num = String.valueOf(i + 1);
             int numColor = isSelected ? CSRenderUtil.CS_ORANGE : 0xFF888888;
             g.drawString(font, num,
@@ -329,29 +267,14 @@ public class CSHudOverlay {
         }
     }
 
-    private record Layout(
-            int scale,
-            int padLeft,
-            int hpBarW,
-            int hpBarH,
-            int hpY,
-            int apY,
-            int slotSize
-    ) {
-        int scale(int base) {
-            return Math.max(1, base * scale / 3);
-        }
+    // ====================== Helpers ======================
 
-        static Layout forScreen(int w, int h) {
-            int minDim = Math.min(w, h);
-            int scale = Math.max(1, Math.min(6, minDim / 180));
-            int padLeft = Math.max(8, scale * 6);
-            int hpBarW = Math.max(120, scale * 90);
-            int hpBarH = Math.max(4, scale * 3);
-            int slotSize = Math.max(28, scale * 14);
-            int hpY = h - slotSize - scale * 32;
-            int apY = hpY + hpBarH + scale * 6;
-            return new Layout(scale, padLeft, hpBarW, hpBarH, hpY, apY, slotSize);
-        }
+    /**
+     * GUI scale helper — same math as the old Layout class.
+     */
+    private static int mcScale(int base) {
+        Minecraft mc = Minecraft.getInstance();
+        int guiScale = mc.getWindow().getGuiScale();
+        return Math.max(1, base * guiScale / 3);
     }
 }
