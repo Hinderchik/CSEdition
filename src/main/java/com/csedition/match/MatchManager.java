@@ -251,6 +251,14 @@ public class MatchManager {
             if (sp == null) continue;
             PlayerData pd = playerDataMap.get(uuid);
             BlockPos spawn = map.getRandomSpawn(pd.getTeam(), random);
+            if (spawn == null) {
+                // Нет ни спавнов ни лобби — не телепортируем, оставляем где есть
+                sp.sendSystemMessage(Component.literal("§cNo spawns configured for " + pd.getTeam()
+                        + " and no lobby set! Use /cs setlobby and /cs setspawn " + currentMapId + " " + pd.getTeam()));
+                giveBaseLoadout(sp, pd, mode);
+                sendMoneyUpdate(sp, pd);
+                continue;
+            }
             sp.teleportTo(spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5);
             giveBaseLoadout(sp, pd, mode);
             sendMoneyUpdate(sp, pd);

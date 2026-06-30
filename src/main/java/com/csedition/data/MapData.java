@@ -109,7 +109,11 @@ public class MapData {
 
     public BlockPos getRandomSpawn(Team team, java.util.Random random) {
         List<BlockPos> list = (team == Team.T) ? tSpawns : ctSpawns;
-        if (list.isEmpty()) return lobbySpawn;
+        if (list.isEmpty()) {
+            // Нет спавнов для команды — фоллбек на лобби.
+            // Если лобби тоже не задано, возвращаем null чтобы caller мог обработать.
+            return lobbySpawn;
+        }
         return list.get(random.nextInt(list.size()));
     }
 }
