@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="${forge_version}"
+license="MIT"
+
+[[mods]]
+modId="csedition"
+version="${file.jarVersion}"
+displayName="CS Edition"
+description="CS-style shooter mod built on top of TaCZ for Minecraft 1.20.1"
+authors="Hinderchik"
+logoFile="icon.png"
+
+[[dependencies.csedition]]
+    modId="forge"
+    mandatory=true
+    versionRange="${forge_version}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.csedition]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.csedition]]
+    modId="tacz"
+    mandatory=true
+    versionRange="*"
+    ordering="AFTER"
+    side="BOTH"
