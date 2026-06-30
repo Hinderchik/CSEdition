@@ -15,22 +15,6 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-/**
- * Custom HUD drawn in RenderGuiOverlayEvent.Pre of minecraft:chat.
- *
- * Why this works everywhere (OptiFine, Embeddium, Sodium, vanilla):
- *  - minecraft:chat overlay is ALWAYS rendered every frame
- *  - We never cancel it (only hotbar/health/food/etc. are cancelled)
- *  - Pre fires before chat renders, so our HUD draws onto frame buffer first
- *  - Chat text is small and doesn't overlap our HUD areas
- *
- * Layout (screen-space):
- *  - HP/AP bars: bottom-left
- *  - Money: top-right
- *  - Phase timer: top-center
- *  - Scoreboard: below phase timer
- *  - Hotbar: right side, vertical 3 slots
- */
 @OnlyIn(Dist.CLIENT)
 public class CSHudOverlay {
 
@@ -39,7 +23,6 @@ public class CSHudOverlay {
     private static final int HOTBAR_SLOTS = 3;
     private static final int SLOT_GAP = 4;
 
-    // Caches — only used to skip text redraws when value unchanged
     private int lastHpInt = -1;
     private int lastArmor = -1;
     private int lastMoney = Integer.MIN_VALUE;
@@ -47,7 +30,6 @@ public class CSHudOverlay {
     private GamePhase lastPhase = null;
 
     public CSHudOverlay() {
-        // Register on MinecraftForge.EVENT_BUS for the overlay event
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(this);
     }
 
@@ -85,8 +67,6 @@ public class CSHudOverlay {
         drawHotbar(g, p, w, h);
     }
 
-    // ====================== HP / AP bars ======================
-
     private void drawHealthArmor(GuiGraphics g, Player p, int screenH) {
         Font font = Minecraft.getInstance().font;
         int barW = Math.max(120, mcScale(90));
@@ -100,12 +80,10 @@ public class CSHudOverlay {
         int armor = p.getArmorValue();
         float apRatio = Math.min(1f, armor / 20f);
 
-        // HP bar
         g.fill(x - 1, hpY - 1, x + barW + 1, hpY + barH + 1, 0xFF000000);
         g.fill(x, hpY, x + barW, hpY + barH, 0xFF1A0A0A);
         int hpFill = (int) (barW * hpRatio);
         if (hpFill > 0) g.fill(x, hpY, x + hpFill, hpY + barH, CSRenderUtil.CS_RED);
-        // segment ticks
         for (int i = 1; i < 4; i++) {
             int sx = x + (barW * i / 4);
             g.fill(sx, hpY, sx + 1, hpY + barH, 0x66000000);
@@ -117,7 +95,6 @@ public class CSHudOverlay {
             lastHpInt = hpInt;
         }
 
-        // AP bar
         int apY = hpY + barH + mcScale(6);
         g.fill(x - 1, apY - 1, x + barW + 1, apY + barH + 1, 0xFF000000);
         g.fill(x, apY, x + barW, apY + barH, 0xFF1A0A0A);
@@ -133,8 +110,6 @@ public class CSHudOverlay {
             lastArmor = armor;
         }
     }
-
-    // ====================== Money ======================
 
     private void drawMoney(GuiGraphics g, int screenW) {
         int money = ClientState.getMoney();
@@ -153,8 +128,6 @@ public class CSHudOverlay {
             lastMoney = money;
         }
     }
-
-    // ====================== Phase timer ======================
 
     private void drawPhaseTimer(GuiGraphics g, int screenW) {
         GamePhase phase = ClientState.getPhase();
@@ -187,8 +160,6 @@ public class CSHudOverlay {
         }
     }
 
-    // ====================== Scoreboard ======================
-
     private void drawScoreboard(GuiGraphics g, int screenW) {
         MatchManager mm = MatchManager.getInstance();
         if (mm == null) return;
@@ -215,8 +186,6 @@ public class CSHudOverlay {
         g.drawString(font, ctText, bgX1 + 4 + tW + colonW, y + 3, CSRenderUtil.CS_BLUE);
         g.drawString(font, " / " + target, bgX1 + 4 + tW + colonW + ctW, y + 3, CSRenderUtil.CS_YELLOW);
     }
-
-    // ====================== Vertical hotbar ======================
 
     private void drawHotbar(GuiGraphics g, Player p, int screenW, int screenH) {
         Font font = Minecraft.getInstance().font;
@@ -267,14 +236,9 @@ public class CSHudOverlay {
         }
     }
 
-    // ====================== Helpers ======================
-
-    /**
-     * GUI scale helper — same math as the old Layout class.
-     */
     private static int mcScale(int base) {
         Minecraft mc = Minecraft.getInstance();
-        int guiScale = mc.getWindow().getGuiScale();
+        int guiScale = (int) mc.getWindow().getGuiScale();
         return Math.max(1, base * guiScale / 3);
     }
 }
