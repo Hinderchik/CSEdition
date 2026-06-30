@@ -68,6 +68,20 @@ public class CSHudOverlay {
     }
 
     /**
+     * Direct render path — draws our HUD in the Pre event of the hotbar
+     * overlay (which we cancel anyway). This fires BEFORE the overlay
+     * renders, so our HUD draws onto the frame buffer first.
+     *
+     * This is the PRIMARY render path now since mixins and custom overlays
+     * have proven unreliable across Forge 1.20.x patch versions.
+     */
+    @SubscribeEvent
+    public void onRenderOverlayPost(RenderGuiOverlayEvent.Post event) {
+        if (!"minecraft:hotbar".equals(event.getOverlay().id().toString())) return;
+        doRender(event.getGuiGraphics());
+    }
+
+    /**
      * Public render method called by the custom overlay
      * (registered via RegisterGuiOverlaysEvent) AND by the mixin
      * fallback (MixinGui renders at end of Gui.render).

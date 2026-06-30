@@ -185,11 +185,11 @@ public final class WeaponConfig {
         addDefault(DEFAULT_SHOTGUNS, "shotgun", "SEMI");
         addDefault(DEFAULT_HEAVY, "heavy", "AUTO");
         // Утилити (броня)
-        WEAPONS.put("tacz:kevlar", new WeaponDef("tacz:kevlar", "Kevlar", 0, "NONE", 650, "utility"));
-        PRICES.put("tacz:kevlar", 650);
+        WEAPONS.put("tacz:kevlar", new WeaponDef("tacz:kevlar", "БРОНЯ", 0, "NONE", 1000, "utility"));
+        PRICES.put("tacz:kevlar", 1000);
         CATEGORIES.put("tacz:kevlar", "utility");
-        WEAPONS.put("tacz:helmet", new WeaponDef("tacz:helmet", "Helmet", 0, "NONE", 1000, "utility"));
-        PRICES.put("tacz:helmet", 1000);
+        WEAPONS.put("tacz:helmet", new WeaponDef("tacz:helmet", "ШЛЕМ", 0, "NONE", 650, "utility"));
+        PRICES.put("tacz:helmet", 650);
         CATEGORIES.put("tacz:helmet", "utility");
     }
 

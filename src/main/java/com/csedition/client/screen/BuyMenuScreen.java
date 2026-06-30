@@ -169,14 +169,35 @@ public class BuyMenuScreen extends Screen {
     }
 
     /**
-     * Создаёт ItemStack оружия для отображения иконки.
-     * Используем TaczHelper.createGun — он возвращает предмет с правильным
-     * base item (tacz:modern_kinetic_gun) и NBT GunId, по которому TaCZ
-     * выбирает модель и текстуру.
+     * Создаёт ItemStack для отображения иконки в меню закупа.
+     * - TaCZ оружие: TaczHelper.createGun (правильный base item + NBT GunId)
+     * - Броня (tacz:kevlar / tacz:helmet): настоящая Netherite броня с Protection IV
      */
     private ItemStack getItemStack(String gunId) {
+        if ("tacz:kevlar".equals(gunId)) {
+            // Kevlar = Netherite Chestplate с Protection IV ($1000)
+            return createArmorIcon("minecraft:netherite_chestplate");
+        }
+        if ("tacz:helmet".equals(gunId)) {
+            // Helmet = Netherite Helmet с Protection IV ($650)
+            return createArmorIcon("minecraft:netherite_helmet");
+        }
         ItemStack stack = TaczHelper.createGun(gunId);
         return stack.isEmpty() ? ItemStack.EMPTY : stack;
+    }
+
+    /**
+     * Создаёт ItemStack с Netherite бронёй и Protection IV для отображения иконки.
+     */
+    private ItemStack createArmorIcon(String itemId) {
+        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS
+                .getValue(new net.minecraft.resources.ResourceLocation(itemId));
+        if (item == null) return ItemStack.EMPTY;
+        ItemStack stack = new ItemStack(item);
+        var ench = net.minecraftforge.registries.ForgeRegistries.ENCHANTMENTS
+                .getValue(new net.minecraft.resources.ResourceLocation("minecraft:protection"));
+        if (ench != null) stack.enchant(ench, 4);
+        return stack;
     }
 
     @Override
