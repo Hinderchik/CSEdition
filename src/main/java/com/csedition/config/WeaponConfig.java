@@ -191,6 +191,29 @@ public final class WeaponConfig {
         WEAPONS.put("tacz:helmet", new WeaponDef("tacz:helmet", "ШЛЕМ", 0, "NONE", 650, "utility"));
         PRICES.put("tacz:helmet", 650);
         CATEGORIES.put("tacz:helmet", "utility");
+
+        // Ножи (бесплатные, выбираются в закупе) — используют lrtactical:melee с NBT MeleeWeaponId
+        addKnife("lrtactical:baseball_bat", "Бейсбольная бита");
+        addKnife("cs2_wt:karambit", "Керамбит");
+        addKnife("cs2_wt:tactical", "Тактический нож");
+        addKnife("cs2_wt:css", "CSS нож");
+        addKnife("mcs2k:q7s1t4", "Q7S1T4");
+        addKnife("cs2_wt:butterfly", "Бабочка");
+        addKnife("cs2_wt:m9", "M9 Bayonet");
+        addKnife("cs2_wt:skeleton", "Скелет");
+        addKnife("cs2_wt:push", "Толкающий");
+    }
+
+    /**
+     * Добавляет нож в каталог. Ножи бесплатные (price=0), используют общий
+     * предмет lrtactical:melee с разным NBT MeleeWeaponId.
+     */
+    private static void addKnife(String meleeId, String displayName) {
+        // Ключ каталога — melee ID. Это одновременно и ID для покупки и
+        // значение NBT MeleeWeaponId в предмете lrtactical:melee.
+        WEAPONS.put(meleeId, new WeaponDef(meleeId, displayName, 0, "NONE", 0, "knife"));
+        PRICES.put(meleeId, 0);
+        CATEGORIES.put(meleeId, "knife");
     }
 
     private static void addDefault(Map<String, int[]> src, String category, String mode) {

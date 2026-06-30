@@ -31,8 +31,8 @@ public class BuyMenuScreen extends Screen {
     private static final int CATS_PER_ROW = 6;
 
     // Категории для отображения
-    private static final String[] CATEGORIES = {"pistol", "smg", "rifle", "sniper", "heavy", "utility"};
-    private static final String[] CATEGORY_NAMES = {"ПИСТОЛЕТЫ", "ПП", "АВТОМАТЫ", "СНАЙПЕРКИ", "ТЯЖЁЛОЕ", "СНАРЯЖЕНИЕ"};
+    private static final String[] CATEGORIES = {"pistol", "smg", "rifle", "sniper", "heavy", "utility", "knife"};
+    private static final String[] CATEGORY_NAMES = {"ПИСТОЛЕТЫ", "ПП", "АВТОМАТЫ", "СНАЙПЕРКИ", "ТЯЖЁЛОЕ", "СНАРЯЖЕНИЕ", "НОЖИ"};
 
     // Скролл
     private int scrollOffset = 0;
@@ -209,18 +209,35 @@ public class BuyMenuScreen extends Screen {
      * Создаёт ItemStack для отображения иконки в меню закупа.
      * - TaCZ оружие: TaczHelper.createGun (правильный base item + NBT GunId)
      * - Броня (tacz:kevlar / tacz:helmet): настоящая Netherite броня с Protection IV
+     * - Ножи (lrtactical:* / cs2_wt:* / mcs2k:*): lrtactical:melee с NBT MeleeWeaponId
      */
     private ItemStack getItemStack(String gunId) {
         if ("tacz:kevlar".equals(gunId)) {
-            // Kevlar = Netherite Chestplate с Protection IV ($1000)
             return createArmorIcon("minecraft:netherite_chestplate");
         }
         if ("tacz:helmet".equals(gunId)) {
-            // Helmet = Netherite Helmet с Protection IV ($650)
             return createArmorIcon("minecraft:netherite_helmet");
+        }
+        if ("knife".equals(com.csedition.match.GunPriceTable.getCategory(gunId))) {
+            return createKnifeIcon(gunId);
         }
         ItemStack stack = TaczHelper.createGun(gunId);
         return stack.isEmpty() ? ItemStack.EMPTY : stack;
+    }
+
+    /**
+     * Создаёт ItemStack ножа (lrtactical:melee) с NBT MeleeWeaponId.
+     * @param meleeId значение MeleeWeaponId (например "cs2_wt:karambit")
+     */
+    private ItemStack createKnifeIcon(String meleeId) {
+        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS
+                .getValue(new net.minecraft.resources.ResourceLocation("lrtactical:melee"));
+        if (item == null) return ItemStack.EMPTY;
+        ItemStack stack = new ItemStack(item);
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putString("MeleeWeaponId", meleeId);
+        stack.setTag(tag);
+        return stack;
     }
 
     /**

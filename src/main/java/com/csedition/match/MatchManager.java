@@ -17,6 +17,7 @@ import com.csedition.network.PacketRoundEnd;
 import com.csedition.event.MatchEvents;
 import com.csedition.tacz.TaczHelper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -474,6 +475,23 @@ public class MatchManager {
             return;
         }
 
+        // === Спецпредмет: нож (lrtactical:melee с NBT MeleeWeaponId) ===
+        if ("knife".equals(GunPriceTable.getCategory(gunId))) {
+            ItemStack knife = createKnifeItem(gunId);
+            if (knife.isEmpty()) {
+                player.sendSystemMessage(Component.literal("§cKnife item not available."));
+                return;
+            }
+            if (!hasInventorySpace(player)) {
+                player.sendSystemMessage(Component.literal("§cInventory full! Max " + CSConfig.getMaxInventorySlots() + " slots."));
+                return;
+            }
+            player.getInventory().add(knife);
+            sendMoneyUpdate(player, pd);
+            player.sendSystemMessage(Component.literal("§aKnife picked (free)"));
+            return;
+        }
+
         ItemStack gun = TaczHelper.createGun(gunId);
         if (gun.isEmpty()) {
             pd.addMoney(price);
@@ -491,10 +509,25 @@ public class MatchManager {
     }
 
     /**
-     * Р В Р’В­Р РЋРІР‚С™Р В РЎвЂў Р В Р’В±Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р РЋР РЏ (kevlar/helmet), Р В Р’В° Р В Р вЂ¦Р В Р’Вµ TaCZ-Р В РЎвЂ”Р РЋРЎвЂњР РЋРІвЂљВ¬Р В РЎвЂќР В Р’В°.
+     * Это броня (kevlar/helmet), а не TaCZ-предмет.
      */
     private static boolean isArmorId(String gunId) {
         return "tacz:kevlar".equals(gunId) || "tacz:helmet".equals(gunId);
+    }
+
+    /**
+     * Создаёт ItemStack ножа: lrtactical:melee с NBT MeleeWeaponId = gunId.
+     * @param meleeId значение MeleeWeaponId (например "cs2_wt:karambit")
+     */
+    private static ItemStack createKnifeItem(String meleeId) {
+        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS
+                .getValue(new net.minecraft.resources.ResourceLocation("lrtactical:melee"));
+        if (item == null) return ItemStack.EMPTY;
+        ItemStack stack = new ItemStack(item);
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putString("MeleeWeaponId", meleeId);
+        stack.setTag(tag);
+        return stack;
     }
 
     /**
