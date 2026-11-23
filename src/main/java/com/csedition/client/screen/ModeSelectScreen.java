@@ -417,10 +417,16 @@ public class ModeSelectScreen extends Screen {
         if (delta > 0) scrollOffset = Math.max(0, scrollOffset - step);
         else if (delta < 0) scrollOffset = Math.min(maxScroll, scrollOffset + step);
         if (old != scrollOffset) {
-            rebuildWidgets();
+            computeLayout();
             return true;
         }
         return false;
+    }
+
+    @Override
+    public void resize(net.minecraft.client.Minecraft mc, int width, int height) {
+        super.resize(mc, width, height);
+        computeLayout();
     }
 
     @Override

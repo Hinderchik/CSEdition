@@ -10,6 +10,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.Map;
 
 public final class TaczHelper {
@@ -29,6 +30,9 @@ public final class TaczHelper {
             "tacz:modern_kinetic_gun_gray",
             "tacz:modern_kinetic_gun_debug",
     };
+
+    /** Кэш проверенных ResourceLocation — предотвращает выбросы при невалидных ID */
+    private static final Map<String, Boolean> VALID_ID_CACHE = new HashMap<>();
 
     private static Method getCreateGunMethod() {
         if (API_CHECKED) return CREATE_GUN_METHOD;
@@ -52,7 +56,15 @@ public final class TaczHelper {
                         CSEditionMod.LOGGER.info("[CS-Edition] TaCZ API (String) OK ({})", path);
                         return CREATE_GUN_METHOD;
                     } catch (NoSuchMethodException e2) {
-                        CSEditionMod.LOGGER.warn("[CS-Edition] GunItem.createGun not found at {}", path);
+                        try {
+                            // Fallback: try createGun(ResourceLocation) via reflection
+                            CREATE_GUN_METHOD = GUN_ITEM_CLASS.getMethod("createGun", Object.class);
+                            API_AVAILABLE = true;
+                            CSEditionMod.LOGGER.info("[CS-Edition] TaCZ API (Object) OK ({})", path);
+                            return CREATE_GUN_METHOD;
+                        } catch (NoSuchMethodException e3) {
+                            CSEditionMod.LOGGER.warn("[CS-Edition] GunItem.createGun not found at {}", path);
+                        }
                     }
                 }
             } catch (ClassNotFoundException ignored) {}
@@ -93,16 +105,36 @@ public final class TaczHelper {
         return null;
     }
 
+    /**
+     * Создаёт ItemStack оружия. Кэширует результат по gunId.
+     */
     public static ItemStack createGun(String gunId) {
         if (gunId == null || gunId.isEmpty()) return ItemStack.EMPTY;
+        // Валидация ID
+        Boolean valid = VALID_ID_CACHE.get(gunId);
+        if (valid == null) {
+            try {
+                new ResourceLocation(gunId);
+                valid = true;
+            } catch (Exception e) {
+                CSEditionMod.LOGGER.warn("[CS-Edition] Invalid gun ID: {}", gunId);
+                valid = false;
+            }
+            VALID_ID_CACHE.put(gunId, valid);
+        }
+        if (!valid) return ItemStack.EMPTY;
+
         ResourceLocation rl = new ResourceLocation(gunId);
 
         Method method = getCreateGunMethod();
-        if (method != null) {
+        if (method != null && API_AVAILABLE) {
             try {
-                Object result = (method.getParameterTypes()[0] == ResourceLocation.class)
-                        ? method.invoke(null, rl)
-                        : method.invoke(null, gunId);
+                Object result;
+                if (method.getParameterTypes()[0] == ResourceLocation.class) {
+                    result = method.invoke(null, rl);
+                } else {
+                    result = method.invoke(null, gunId);
+                }
                 if (result instanceof ItemStack stack && !stack.isEmpty()) {
                     return ensureLoaded(stack, gunId);
                 }
@@ -121,7 +153,13 @@ public final class TaczHelper {
         return ItemStack.EMPTY;
     }
 
+    private static final Map<String, ItemStack> GUN_CACHE = new HashMap<>();
+
     private static ItemStack buildGunNbt(String gunId, Item baseItem) {
+        // Return cached stack if same gunId hasn't changed config
+        ItemStack cached = GUN_CACHE.get(gunId);
+        if (cached != null && !cached.isEmpty()) return cached;
+
         ItemStack stack = new ItemStack(baseItem);
         CompoundTag tag = stack.getOrCreateTag();
         tag.putString("GunId", gunId);
@@ -135,6 +173,7 @@ public final class TaczHelper {
 
         applyAttachments(tag, gunId);
         stack.setTag(tag);
+        GUN_CACHE.put(gunId, stack);
         CSEditionMod.LOGGER.debug("[CS-Edition] Built gun NBT for: {} (mag={})", gunId, mag);
         return stack;
     }
@@ -173,7 +212,6 @@ public final class TaczHelper {
             modified = true;
         }
         applyAttachments(tag, gunId);
-        modified = true;
         if (modified) stack.setTag(tag);
         return stack;
     }
@@ -183,7 +221,7 @@ public final class TaczHelper {
     }
 
     public static ItemStack createPistol(boolean isT) {
-        return createGun(isT ? "tacz:glock_17" : "mcs2:cs_usp");
+        return createGun(isT ? "tacz:glock_17" : "tacz:usp_45");
     }
 
     public static boolean isTaczAvailable() {

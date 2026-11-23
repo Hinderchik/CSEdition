@@ -37,6 +37,16 @@ public final class CSRenderUtil {
     public static final int CS_BORDER = 0xFF3A3A3A;
     public static final int CS_BORDER_ACCENT = 0xFFFF8C00;
 
+    // === HudStyle aliases (для единообразия с меню/табло/HUD) ===
+    public static final int COLOR_ACCENT = CS_BORDER_ACCENT;        // 0xFFE8B84B
+    public static final int COLOR_PANEL_BG = 0x99101418;            // фон панелей
+    public static final int COLOR_BORDER = 0xFF2A2F36;              // обводка
+    public static final int COLOR_TEXT_WHITE = 0xFFE6EAF0;          // основной текст
+    public static final int COLOR_TEXT_MUTED = 0xFF9AA4AF;          // приглушённый текст
+    public static final int COLOR_T = 0xFFD9A33A;                   // T цвет
+    public static final int COLOR_CT = 0xFF5B8FD6;                  // CT цвет
+    public static final int COLOR_MONEY = 0xFF7ED957;               // деньги
+
     // ====================== Градиент ======================
 
     /**

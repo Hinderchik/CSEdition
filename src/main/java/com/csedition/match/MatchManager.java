@@ -14,7 +14,6 @@ import com.csedition.network.PacketMapList;
 import com.csedition.network.PacketMoneyUpdate;
 import com.csedition.network.PacketPhaseUpdate;
 import com.csedition.network.PacketRoundEnd;
-import com.csedition.event.MatchEvents;
 import com.csedition.tacz.TaczHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -27,23 +26,8 @@ import net.minecraftforge.network.PacketDistributor;
 import java.util.*;
 
 /**
- * Р В РІР‚СљР В Р’В»Р В Р’В°Р В Р вЂ Р В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ Р РЋР С“Р В Р’ВµР РЋР вЂљР В Р вЂ Р В Р’ВµР РЋР вЂљР В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ Р В РЎВР В Р’ВµР В Р вЂ¦Р В Р’ВµР В РўвЂР В Р’В¶Р В Р’ВµР РЋР вЂљ Р В РЎВР В Р’В°Р РЋРІР‚С™Р РЋРІР‚РЋР В Р’В°.
- * Singleton Р Р†Р вЂљРІР‚Сњ Р В РЎвЂўР В РўвЂР В РЎвЂР В Р вЂ¦ Р В РЎВР В Р’В°Р РЋРІР‚С™Р РЋРІР‚РЋ Р В Р вЂ¦Р В Р’В° Р РЋР С“Р В Р’ВµР РЋР вЂљР В Р вЂ Р В Р’ВµР РЋР вЂљ.
- *
- * Р В Р Р‹Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР РЏР В Р вЂ¦Р В РЎвЂР В Р’Вµ:
- *   - phase: Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋРЎвЂњР РЋРІР‚В°Р В Р’В°Р РЋР РЏ Р РЋРІР‚С›Р В Р’В°Р В Р’В·Р В Р’В° (LOBBY / BUY_TIME / FIGHTING / ROUND_END)
- *   - currentMapId: id Р В Р вЂ Р РЋРІР‚в„–Р В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“ Р В РЎвЂќР В Р’В°Р РЋР вЂљР РЋРІР‚С™Р РЋРІР‚в„–
- *   - currentModeId: id Р В Р вЂ Р РЋРІР‚в„–Р В Р’В±Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р В РЎвЂўР В РЎвЂ“Р В РЎвЂў Р РЋР вЂљР В Р’ВµР В Р’В¶Р В РЎвЂР В РЎВР В Р’В°
- *   - phaseTicks: Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р РЋРІвЂљВ¬Р В Р’ВµР В Р’ВµР РЋР С“Р РЋР РЏ Р В Р вЂ Р РЋР вЂљР В Р’ВµР В РЎВР РЋР РЏ Р РЋРІР‚С›Р В Р’В°Р В Р’В·Р РЋРІР‚в„– Р В Р вЂ  Р РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В Р’В°Р РЋРІР‚В¦
- *   - playerDataMap: Р В РўвЂР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ Р В РЎвЂР В РЎвЂ“Р РЋР вЂљР В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ  (UUID -> PlayerData)
- *   - roundNumber: Р В Р вЂ¦Р В РЎвЂўР В РЎВР В Р’ВµР РЋР вЂљ Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋРЎвЂњР РЋРІР‚В°Р В Р’ВµР В РЎвЂ“Р В РЎвЂў Р РЋР вЂљР В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р В РўвЂР В Р’В°
- *   - matchOver: true Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р В РЎВР В Р’В°Р РЋРІР‚С™Р РЋРІР‚РЋ Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦ (Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂў-Р РЋРІР‚С™Р В РЎвЂў Р В Р вЂ¦Р В Р’В°Р В Р’В±Р РЋР вЂљР В Р’В°Р В Р’В» killsToWin)
- *
- * Р В Р Р‹Р В РЎвЂР В Р вЂ¦Р РЋРІР‚В¦Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р В РЎвЂР В Р’В·Р В Р’В°Р РЋРІР‚В Р В РЎвЂР РЋР РЏ Р РЋР С“ Р В РЎвЂќР В Р’В»Р В РЎвЂР В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В РЎвЂўР В РЎВ:
- *   - Р В РЎСџР РЋР вЂљР В РЎвЂ Р РЋР С“Р В РЎВР В Р’ВµР В Р вЂ¦Р В Р’Вµ Р РЋРІР‚С›Р В Р’В°Р В Р’В·Р РЋРІР‚в„– Р РЋР вЂљР В Р’В°Р РЋР С“Р РЋР С“Р РЋРІР‚в„–Р В Р’В»Р В Р’В°Р В Р’ВµР РЋРІР‚С™ PacketPhaseUpdate Р В Р вЂ Р РЋР С“Р В Р’ВµР В РЎВ Р В РЎвЂР В РЎвЂ“Р РЋР вЂљР В РЎвЂўР В РЎвЂќР В Р’В°Р В РЎВ.
- *   - Р В РЎСџР РЋР вЂљР В РЎвЂ Р В РЎвЂР В Р’В·Р В РЎВР В Р’ВµР В Р вЂ¦Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В РЎвЂ Р В РўвЂР В Р’ВµР В Р вЂ¦Р В Р’ВµР В РЎвЂ“/Р РЋРЎвЂњР В Р’В±Р В РЎвЂР В РІвЂћвЂ“Р РЋР С“Р РЋРІР‚С™Р В Р вЂ  Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В Р’В»Р РЋР РЏР В Р’ВµР РЋРІР‚С™ PacketMoneyUpdate Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р В РЎвЂќР РЋР вЂљР В Р’ВµР РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂўР В РЎВР РЋРЎвЂњ Р В РЎвЂР В РЎвЂ“Р РЋР вЂљР В РЎвЂўР В РЎвЂќР РЋРЎвЂњ.
- *   - Р В РЎСџР РЋР вЂљР В РЎвЂ Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚РЋР В Р’В°Р В Р вЂ¦Р В РЎвЂР В РЎвЂ Р РЋР вЂљР В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р В РўвЂР В Р’В° Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В Р’В»Р РЋР РЏР В Р’ВµР РЋРІР‚С™ PacketRoundEnd (Р В РЎвЂ”Р В РЎвЂўР В Р’В±Р В Р’ВµР В РўвЂР В РЎвЂР РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР Р‰ + Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋРІР‚РЋР В РЎвЂР В Р вЂ¦Р В Р’В°).
- *   - Р В РЎСџР РЋР вЂљР В РЎвЂ Р В Р вЂ Р РЋРІР‚В¦Р В РЎвЂўР В РўвЂР В Р’Вµ Р В РЎвЂР В РЎвЂ“Р РЋР вЂљР В РЎвЂўР В РЎвЂќР В Р’В° Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂ”Р РЋР вЂљР В Р’В°Р В Р вЂ Р В Р’В»Р РЋР РЏР В Р’ВµР РЋРІР‚С™ PacketMapList Р РЋР С“Р В РЎвЂў Р РЋР С“Р В РЎвЂ”Р В РЎвЂР РЋР С“Р В РЎвЂќР В РЎвЂўР В РЎВ Р В РЎвЂќР В Р’В°Р РЋР вЂљР РЋРІР‚С™ Р В РЎвЂ PacketSyncModes.
+ * Серверная логика матча: фаза, таймер, распределение по командам.
+ * Singleton, делегирует пакеты клиентам через сеть.
  */
 public class MatchManager {
     private static final MatchManager INSTANCE = new MatchManager();
@@ -68,12 +52,13 @@ public class MatchManager {
     private int lastBroadcastTicks = -1;
     private String lastBroadcastMap = null;
     private String lastBroadcastMode = null;
+    private long lastScoreboardSend = 0L;
 
     private MatchManager() {}
 
     public static MatchManager getInstance() { return INSTANCE; }
 
-    // ====================== Р В Р’ВР В РЎвЂ“Р РЋР вЂљР В РЎвЂўР В РЎвЂќР В РЎвЂ ======================
+    // ====================== Управление игроками ======================
 
     public PlayerData getOrCreate(ServerPlayer player) {
         return playerDataMap.computeIfAbsent(player.getUUID(), PlayerData::new);
@@ -94,14 +79,16 @@ public class MatchManager {
         CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                 new com.csedition.network.PacketSyncModes(ModeConfig.toJson()));
         broadcastPhase();
+        sendScoreboardSync(); // синк таблица при входе
         teleportToLobby(player);
     }
 
     public void onPlayerLeave(ServerPlayer player) {
-        // Р В РІР‚СњР В Р’В°Р В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ Р РЋР С“Р В РЎвЂўР РЋРІР‚В¦Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р РЋР РЏР В Р’ВµР В РЎВ
+        playerDataMap.remove(player.getUUID());
+        sendScoreboardSync(); // синк таблица при выходе
     }
 
-    // ====================== Р В Р’В¤Р В Р’В°Р В Р’В·Р РЋРІР‚в„– ======================
+    // ====================== Геттеры фазы ======================
 
     public GamePhase getPhase() { return phase; }
     public String getCurrentMapId() { return currentMapId; }
@@ -145,6 +132,7 @@ public class MatchManager {
         CSEditionMod.LOGGER.info("[CS-Edition] Phase -> {} ({} ticks, mode={})", newPhase, phaseTicks, currentModeId);
     }
 
+    /** Слать пакет только при реальной смене состояния, не каждый тик. */
     public void broadcastPhase() {
         if (cachedPhasePacket == null
                 || phase != lastBroadcastPhase
@@ -165,13 +153,52 @@ public class MatchManager {
         }
     }
 
-    // ====================== Р В РЎС›Р В РЎвЂР В РЎвЂќ ======================
+    /**
+     * Отправляет полное табло всем игрокам.
+     * Вызывается по изменению состава / смерти / покупки и ресинком раз в 2с.
+     */
+    public void sendScoreboardSync() {
+        lastScoreboardSend = System.currentTimeMillis();
+        com.csedition.network.PacketScoreboardSync.Entry[] entries =
+                new com.csedition.network.PacketScoreboardSync.Entry[playerDataMap.size()];
+        int idx = 0;
+        UUID selfUuid = null;
+        try {
+            selfUuid = net.minecraft.server.players.PlayerList.class
+                    .getMethod("getPlayer", java.util.UUID.class)
+                    .invoke(null, null) instanceof ServerPlayer sp ? sp.getUUID() : null;
+        } catch (Exception ignored) {}
+        // Проще: берём первого доступного
+        for (java.util.Map.Entry<UUID, PlayerData> e : playerDataMap.entrySet()) {
+            ServerPlayer sp = getServerPlayer(e.getKey());
+            String name = sp != null ? sp.getName().getString() : "Unknown";
+            PlayerData pd = e.getValue();
+            entries[idx++] = new com.csedition.network.PacketScoreboardSync.Entry(
+                    e.getKey(), name,
+                    pd.getTeam() == Team.T ? "T" : (pd.getTeam() == Team.CT ? "CT" : "SPEC"),
+                    pd.getMoney(), pd.isAlive(), pd.getKills(), pd.getDeaths()
+            );
+        }
+        String phaseStr = phase.name();
+        com.csedition.network.PacketScoreboardSync pkt =
+                new com.csedition.network.PacketScoreboardSync(
+                        currentMapId, currentModeId, phaseTicks, phaseStr,
+                        roundNumber, roundsWon.getOrDefault(Team.T, 0),
+                        roundsWon.getOrDefault(Team.CT, 0), entries);
+        for (UUID uuid : playerDataMap.keySet()) {
+            ServerPlayer sp = getServerPlayer(uuid);
+            if (sp != null) {
+                CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), pkt);
+            }
+        }
+    }
+
+    // ====================== Тик сервера ======================
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
 
-        // Р В РЎвЂєР В Р’В±Р РЋР вЂљР В Р’В°Р В Р’В±Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂќР В Р’В° Р В РЎвЂўР РЋРІР‚С™Р В Р’В»Р В РЎвЂўР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“ Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂќР В РЎвЂ Р В РЎвЂ”Р В РЎвЂўР РЋР С“Р В Р’В»Р В Р’Вµ Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚РЋР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋР РЏ Р В РЎВР В Р’В°Р РЋРІР‚С™Р РЋРІР‚РЋР В Р’В°
         if (cleanupTicks > 0) {
             cleanupTicks--;
             if (cleanupTicks <= 0) {
@@ -180,15 +207,26 @@ public class MatchManager {
             return;
         }
 
-        if (phase == GamePhase.LOBBY) return;
+        if (phase == GamePhase.LOBBY) {
+            // В лобби тоже синкаем табло (команды назначены)
+            if (System.currentTimeMillis() - lastScoreboardSend > 2000L) {
+                sendScoreboardSync();
+            }
+            return;
+        }
 
         if (phaseTicks > 0) {
             phaseTicks--;
-            if (phaseTicks % 20 == 0) broadcastPhase();
+            if (phaseTicks % 100 == 0) broadcastPhase();
         }
 
         if (phaseTicks <= 0) {
             advancePhase();
+        }
+
+        // Ресинк таблица раз в 2 секунды
+        if (System.currentTimeMillis() - lastScoreboardSend > 2000L) {
+            sendScoreboardSync();
         }
     }
 
@@ -201,9 +239,12 @@ public class MatchManager {
         }
     }
 
-    // ====================== Р В Р’В Р В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р В РўвЂР РЋРІР‚в„– ======================
+    // ====================== Раунды ======================
 
     public void startNewRound() {
+        // Guard against double-call from endRound
+        if (phase == GamePhase.ROUND_END) return;
+
         int onlineCount = 0;
         for (UUID uuid : playerDataMap.keySet()) {
             if (getServerPlayer(uuid) != null) onlineCount++;
@@ -229,12 +270,12 @@ public class MatchManager {
 
         GameMode mode = getCurrentMode();
 
-        // Р В Р Р‹Р В Р’В±Р РЋР вЂљР В РЎвЂўР РЋР С“ Р В РўвЂР В Р’ВµР В Р вЂ¦Р В Р’ВµР В РЎвЂ“ Р В РЎвЂ Р РЋР С“Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В РЎвЂўР РЋР РЏР В Р вЂ¦Р В РЎвЂР РЋР РЏ (Р В Р вЂ¦Р В РЎвЂў Р В РЎСљР В РІР‚Сћ Р В РЎвЂР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋР РЏ Р Р†Р вЂљРІР‚Сњ Р В РЎвЂўР В Р вЂ¦ Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’В°Р В Р’ВµР РЋРІР‚С™Р РЋР С“Р РЋР РЏ Р РЋРІР‚С™Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў Р В РЎвЂ”Р В РЎвЂўР РЋР С“Р В Р’В»Р В Р’Вµ Р В РЎВР В Р’В°Р РЋРІР‚С™Р РЋРІР‚РЋР В Р’В°)
+        // Сброс денег для всех игроков (старт раунда)
         for (PlayerData pd : playerDataMap.values()) {
             pd.resetForRound(mode.getStartMoney());
         }
 
-        // Р В РЎС›Р В Р’ВµР В Р’В»Р В Р’ВµР В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™ Р В РЎвЂ Р В Р вЂ Р РЋРІР‚в„–Р В РўвЂР В Р’В°Р РЋРІР‚РЋР В Р’В° Р В РЎвЂўР РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В РЎвЂР РЋР РЏ
+        // Разброс по спавнам и выдача базового лута
         for (UUID uuid : playerDataMap.keySet()) {
             ServerPlayer sp = getServerPlayer(uuid);
             if (sp == null) continue;
@@ -249,11 +290,14 @@ public class MatchManager {
     }
 
     /**
-     * Р В РЎвЂєР В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚РЋР В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ Р РЋР вЂљР В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р В РўвЂР В Р’В°.
-     * @param winner Р В РЎвЂ”Р В РЎвЂўР В Р’В±Р В Р’ВµР В РўвЂР В РЎвЂР В Р вЂ Р РЋРІвЂљВ¬Р В Р’В°Р РЋР РЏ Р В РЎвЂќР В РЎвЂўР В РЎВР В Р’В°Р В Р вЂ¦Р В РўвЂР В Р’В° (Р В РЎвЂР В Р’В»Р В РЎвЂ null Р В РЎвЂ”Р РЋР вЂљР В РЎвЂ Р В Р вЂ¦Р В РЎвЂР РЋРІР‚РЋР РЋР Р‰Р В Р’ВµР В РІвЂћвЂ“)
-     * @param reason Р В РЎвЂ”Р РЋР вЂљР В РЎвЂР РЋРІР‚РЋР В РЎвЂР В Р вЂ¦Р В Р’В°: ELIMINATION, TIME_OUT, TARGET_KILLS
+     * Окончание раунда.
+     * @param winner победившая команда (null = ничья)
+     * @param reason ELIMINATION, TIME_OUT, TARGET_KILLS
      */
     public void endRound(Team winner, String reason) {
+        // Guard: не вызывать дважды за один раунд
+        if (phase == GamePhase.ROUND_END) return;
+
         GameMode mode = getCurrentMode();
         for (PlayerData pd : playerDataMap.values()) {
             if (winner != null && pd.getTeam() == winner) {
@@ -261,7 +305,7 @@ public class MatchManager {
             }
         }
 
-        // Р В РЎСџР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’ВµР РЋР вЂљР В РЎвЂќР В Р’В° killsToWin Р Р†Р вЂљРІР‚Сњ Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р В РЎвЂќР РЋРІР‚С™Р В РЎвЂў-Р РЋРІР‚С™Р В РЎвЂў Р В Р вЂ¦Р В Р’В°Р В Р’В±Р РЋР вЂљР В Р’В°Р В Р’В» Р В Р вЂ¦Р РЋРЎвЂњР В Р’В¶Р В Р вЂ¦Р В РЎвЂўР В Р’Вµ Р РЋРІР‚РЋР В РЎвЂР РЋР С“Р В Р’В»Р В РЎвЂў Р В РЎвЂќР В РЎвЂР В Р’В»Р В Р’В»Р В РЎвЂўР В Р вЂ , Р В РЎВР В Р’В°Р РЋРІР‚С™Р РЋРІР‚РЋ Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦
+        // Проверяем killsToWin — если кто-то набрал, матч оконччен
         int killsToWin = CSConfig.getKillsToWin();
         PlayerData topKiller = null;
         for (PlayerData pd : playerDataMap.values()) {
@@ -270,12 +314,10 @@ public class MatchManager {
             }
         }
         if (topKiller != null) {
-            // Р В РЎС™Р В Р’В°Р РЋРІР‚С™Р РЋРІР‚РЋ Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚РЋР В Р’ВµР В Р вЂ¦!
             matchOver = true;
             Team matchWinner = topKiller.getTeam();
             String matchReason = "TARGET_KILLS";
             broadcastRoundEnd(matchWinner, matchReason, roundNumber, topKiller.getKills());
-            // Р В Р Р‹Р В РЎвЂўР В РЎвЂўР В Р’В±Р РЋРІР‚В°Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В Р’Вµ
             for (UUID uuid : playerDataMap.keySet()) {
                 ServerPlayer sp = getServerPlayer(uuid);
                 if (sp != null) {
@@ -284,12 +326,29 @@ public class MatchManager {
                 }
             }
             setPhase(GamePhase.ROUND_END);
-            // Р В Р’В§Р В Р’ВµР РЋР вЂљР В Р’ВµР В Р’В· 5 Р РЋР С“Р В Р’ВµР В РЎвЂќ Р Р†Р вЂљРІР‚Сњ Р РЋРІР‚С™Р В Р’ВµР В Р’В»Р В Р’ВµР В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋРІР‚С™ Р В Р вЂ  Р В Р’В»Р В РЎвЂўР В Р’В±Р В Р’В±Р В РЎвЂ Р В РЎвЂ Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂќР В Р’В° Р В РЎвЂР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋР РЏ
             scheduleMatchEndCleanup();
             return;
         }
 
-        // Р В РЎвЂєР В Р’В±Р РЋРІР‚в„–Р РЋРІР‚РЋР В Р вЂ¦Р В РЎвЂўР В Р’Вµ Р В РЎвЂўР В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚РЋР В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ Р РЋР вЂљР В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р В РўвЂР В Р’В°
+        // Обычное окончание раунда по eliminations или времени
+        // Проверяем roundsToWin — если кто-то набрал, матч оконччен
+        int roundsToWin = getCurrentMode().getRoundsToWin();
+        if (winner != null && roundsWon.getOrDefault(winner, 0) >= roundsToWin) {
+            matchOver = true;
+            String matchReason = "ROUNDS_TO_WIN";
+            broadcastRoundEnd(winner, matchReason, roundNumber, -1);
+            for (UUID uuid : playerDataMap.keySet()) {
+                ServerPlayer sp = getServerPlayer(uuid);
+                if (sp != null) {
+                    sp.sendSystemMessage(Component.literal("=== MATCH OVER === " + winner.name() + " wins! (" + matchReason + ")"));
+                    sendMoneyUpdate(sp, playerDataMap.get(uuid));
+                }
+            }
+            setPhase(GamePhase.ROUND_END);
+            scheduleMatchEndCleanup();
+            return;
+        }
+
         String reasonText = switch (reason) {
             case "ELIMINATION" -> "All enemies eliminated";
             case "TIME_OUT" -> "Time ran out";
@@ -307,9 +366,6 @@ public class MatchManager {
         setPhase(GamePhase.ROUND_END);
     }
 
-    /**
-     * Р В РЎСџР В Р’ВµР РЋР вЂљР В Р’ВµР В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В·Р В РЎвЂќР В Р’В° Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂўР В Р’В±Р РЋР вЂљР В Р’В°Р РЋРІР‚С™Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“ Р РЋР С“Р В РЎвЂўР В Р вЂ Р В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎВР В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В РЎвЂ.
-     */
     public void endRound(Team winner) {
         endRound(winner, "ELIMINATION");
     }
@@ -327,11 +383,10 @@ public class MatchManager {
     private int cleanupTicks = -1;
 
     private void scheduleMatchEndCleanup() {
-        cleanupTicks = 5 * 20; // 5 Р РЋР С“Р В Р’ВµР В РЎвЂќР РЋРЎвЂњР В Р вЂ¦Р В РўвЂ
+        cleanupTicks = 5 * 20; // 5 секунд
     }
 
     private void performMatchEndCleanup() {
-        // Р В РЎвЂєР РЋРІР‚РЋР В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂќР В Р’В° Р В РЎвЂР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋР РЏ (Р РЋР С“ Р РЋРЎвЂњР РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™Р В РЎвЂўР В РЎВ keptItems)
         for (UUID uuid : playerDataMap.keySet()) {
             ServerPlayer sp = getServerPlayer(uuid);
             if (sp == null) continue;
@@ -340,7 +395,7 @@ public class MatchManager {
             }
             teleportToLobby(sp);
         }
-        // Р В Р Р‹Р В Р’В±Р РЋР вЂљР В РЎвЂўР РЋР С“ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋРІР‚С™Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂР В РЎвЂќР В РЎвЂ
+        // Полный сброс статистики после матча
         for (PlayerData pd : playerDataMap.values()) {
             pd.resetStats();
         }
@@ -351,12 +406,9 @@ public class MatchManager {
         setPhase(GamePhase.LOBBY);
     }
 
-    /**
-     * Р В РЎвЂєР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’В°Р В Р’ВµР РЋРІР‚С™ Р В РЎвЂР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋР Р‰, Р РЋР С“Р В РЎвЂўР РЋРІР‚В¦Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р РЋР РЏР РЋР РЏ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р РЋРІР‚в„– Р В РЎвЂР В Р’В· CSConfig.keptItems.
-     */
+    /** Очищает инвентарь, сохраняя только specified items из CSConfig.keptItems. */
     private void clearInventoryKeeping(ServerPlayer player) {
         var inv = player.getInventory();
-        // Р В Р Р‹Р В РЎвЂўР В Р’В±Р В РЎвЂР РЋР вЂљР В Р’В°Р В Р’ВµР В РЎВ Р РЋРІР‚С™Р В РЎвЂў, Р РЋРІР‚РЋР РЋРІР‚С™Р В РЎвЂў Р В Р вЂ¦Р РЋРЎвЂњР В Р’В¶Р В Р вЂ¦Р В РЎвЂў Р РЋР С“Р В РЎвЂўР РЋРІР‚В¦Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰
         List<ItemStack> keep = new ArrayList<>();
         for (int i = 0; i < inv.getContainerSize(); i++) {
             ItemStack stack = inv.getItem(i);
@@ -365,13 +417,12 @@ public class MatchManager {
             }
         }
         inv.clearContent();
-        // Р В РІР‚в„ўР В РЎвЂўР В Р’В·Р В Р вЂ Р РЋР вЂљР В Р’В°Р РЋРІР‚В°Р В Р’В°Р В Р’ВµР В РЎВ Р РЋР С“Р В РЎвЂўР РЋРІР‚В¦Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р РЋРІР‚ВР В Р вЂ¦Р В Р вЂ¦Р РЋРІР‚в„–Р В Р’Вµ
         for (ItemStack s : keep) {
             inv.add(s);
         }
     }
 
-    // ====================== Р В РЎСџР В РЎвЂўР В РЎвЂќР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂќР В Р’В° ======================
+    // ====================== Закуп оружия ======================
 
     public void handleBuyRequest(ServerPlayer player, String gunId) {
         if (player == null) return;
@@ -395,71 +446,57 @@ public class MatchManager {
             player.sendSystemMessage(Component.literal("Unknown weapon."));
             return;
         }
+        // Проверяем место И цену ДО списания денег
+        if (!hasInventorySpace(player)) {
+            player.sendSystemMessage(Component.literal("Inventory full! Max " + CSConfig.getMaxInventorySlots() + " slots."));
+            return;
+        }
         if (!pd.trySpend(price)) {
             player.sendSystemMessage(Component.literal("Not enough money!"));
             return;
         }
 
-        // === Р В Р Р‹Р В РЎвЂ”Р В Р’ВµР РЋРІР‚В Р РЋР С“Р В Р’В»Р РЋРЎвЂњР РЋРІР‚РЋР В Р’В°Р В РІвЂћвЂ“: Р В Р’В±Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р РЋР РЏ (kevlar/helmet) ===
-        // Р В Р’В­Р РЋРІР‚С™Р В РЎвЂў Р В РЎСљР В РІР‚Сћ TaCZ-Р В РЎвЂ”Р РЋРЎвЂњР РЋРІвЂљВ¬Р В РЎвЂќР В РЎвЂ Р Р†Р вЂљРІР‚Сњ Р В РўвЂР В РЎвЂўР В Р’В±Р В Р’В°Р В Р вЂ Р В Р’В»Р РЋР РЏР В Р’ВµР В РЎВ armor attribute Р В Р вЂ¦Р В Р’В°Р В РЎвЂ”Р РЋР вЂљР РЋР РЏР В РЎВР РЋРЎвЂњР РЋР вЂ№, Р В Р’В±Р В Р’ВµР В Р’В· Р В Р вЂ Р РЋРІР‚в„–Р В РўвЂР В Р’В°Р РЋРІР‚РЋР В РЎвЂ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™Р В Р’В°.
+        // === Броня: tacz:kevlar / tacz:helmet ===
+        // Применяется к armor attribute, не требует слота в инвентаре как предмета
         if (isArmorId(gunId)) {
+            // Цена уже проверена выше (trySpend), применяем броню
             applyArmor(player, gunId);
             sendMoneyUpdate(player, pd);
-            player.sendSystemMessage(Component.literal("Р вЂ™Р’В§a+" + armorPointsFor(gunId) + " armor"));
+            player.sendSystemMessage(Component.literal("\u00A7a+" + armorPointsFor(gunId) + " armor"));
             return;
         }
 
+        // Проверка: оружие должно существовать
         ItemStack gun = TaczHelper.createGun(gunId);
         if (gun.isEmpty()) {
-            pd.addMoney(price);
+            pd.addMoney(price); // возвращаем деньги
             player.sendSystemMessage(Component.literal("Weapon not available."));
-            return;
-        }
-        // Р В РЎСџР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’ВµР РЋР вЂљР В РЎвЂќР В Р’В° Р В Р’В»Р В РЎвЂР В РЎВР В РЎвЂР РЋРІР‚С™Р В Р’В° Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ 
-        if (!hasInventorySpace(player)) {
-            pd.addMoney(price);
-            player.sendSystemMessage(Component.literal("Inventory full! Max " + CSConfig.getMaxInventorySlots() + " slots."));
             return;
         }
         player.getInventory().add(gun);
         sendMoneyUpdate(player, pd);
     }
 
-    /**
-     * Р В Р’В­Р РЋРІР‚С™Р В РЎвЂў Р В Р’В±Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р РЋР РЏ (kevlar/helmet), Р В Р’В° Р В Р вЂ¦Р В Р’Вµ TaCZ-Р В РЎвЂ”Р РЋРЎвЂњР РЋРІвЂљВ¬Р В РЎвЂќР В Р’В°.
-     */
     private static boolean isArmorId(String gunId) {
         return "tacz:kevlar".equals(gunId) || "tacz:helmet".equals(gunId);
     }
 
-    /**
-     * Р В Р Р‹Р В РЎвЂќР В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў armor-Р В РЎвЂўР РЋРІР‚РЋР В РЎвЂќР В РЎвЂўР В Р вЂ  Р В РўвЂР В Р’В°Р РЋРІР‚ВР РЋРІР‚С™ Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™.
-     */
     private static int armorPointsFor(String gunId) {
-        return "tacz:helmet".equals(gunId) ? 100 : 50; // Р РЋРІвЂљВ¬Р В Р’В»Р В Р’ВµР В РЎВ Р В РўвЂР В Р’В°Р РЋРІР‚ВР РЋРІР‚С™ Р В Р’В±Р В РЎвЂўР В Р’В»Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’Вµ (helmet + kevlar)
+        return "tacz:helmet".equals(gunId) ? 100 : 50;
     }
 
-    /**
-     * Р В РЎСџР РЋР вЂљР В РЎвЂР В РЎВР В Р’ВµР В Р вЂ¦Р РЋР РЏР В Р’ВµР РЋРІР‚С™ Р В Р’В±Р РЋР вЂљР В РЎвЂўР В Р вЂ¦Р РЋР вЂ№: Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂР РЋРІР‚С™ leather_chestplate/leather_helmet Р В Р вЂ  armor-Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™,
-     * Р В Р’В»Р В РЎвЂР В Р’В±Р В РЎвЂў Р В РўвЂР В РЎвЂўР В Р’В±Р В Р’В°Р В Р вЂ Р В Р’В»Р РЋР РЏР В Р’ВµР РЋРІР‚С™ armor attribute Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™ Р В Р’В·Р В Р’В°Р В Р вЂ¦Р РЋР РЏР РЋРІР‚С™.
-     *
-     * Р В Р’ВР РЋР С“Р В РЎвЂ”Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В Р’В·Р РЋРЎвЂњР В Р’ВµР РЋРІР‚С™ Р РЋРЎвЂњР В Р вЂ¦Р В РЎвЂР В РЎвЂќР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ UUID Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎВР В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С›Р В РЎвЂР В РЎвЂќР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљР В Р’В° Р РЋРІР‚РЋР РЋРІР‚С™Р В РЎвЂўР В Р’В±Р РЋРІР‚в„– Р В Р вЂ¦Р В Р’Вµ Р В РўвЂР РЋРЎвЂњР В Р’В±Р В Р’В»Р В РЎвЂР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р РЋР Р‰.
-     */
     private static final java.util.UUID ARMOR_MODIFIER_ID =
             java.util.UUID.fromString("9c5b6f1e-3a2d-4e8b-9f1c-7a8b9c0d1e2f");
 
     private void applyArmor(ServerPlayer player, String gunId) {
         var armorAttr = player.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR);
         if (armorAttr == null) return;
-        // Р В Р в‚¬Р В Р’В±Р В РЎвЂР РЋР вЂљР В Р’В°Р В Р’ВµР В РЎВ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚в„–Р В РІвЂћвЂ“ Р В РЎВР В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С›Р В РЎвЂР В РЎвЂќР В Р’В°Р РЋРІР‚С™Р В РЎвЂўР РЋР вЂљ Р В Р’ВµР РЋР С“Р В Р’В»Р В РЎвЂ Р В Р’В±Р РЋРІР‚в„–Р В Р’В»
         armorAttr.removeModifier(ARMOR_MODIFIER_ID);
-        // Р В РІР‚СњР В РЎвЂўР В Р’В±Р В Р’В°Р В Р вЂ Р В Р’В»Р РЋР РЏР В Р’ВµР В РЎВ Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р РЋРІР‚в„–Р В РІвЂћвЂ“
         int points = armorPointsFor(gunId);
         var modifier = new net.minecraft.world.entity.ai.attributes.AttributeModifier(
                 ARMOR_MODIFIER_ID, "cs-edition armor", points,
                 net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADDITION);
         armorAttr.addPermanentModifier(modifier);
-        // Р В РЎС›Р В Р’В°Р В РЎвЂќР В Р’В¶Р В Р’Вµ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р В Р вЂ Р В РЎвЂР В РЎВ Р В Р вЂ Р В РЎвЂР В Р’В·Р РЋРЎвЂњР В Р’В°Р В Р’В»Р РЋР Р‰Р В Р вЂ¦Р РЋРІР‚в„–Р В РІвЂћвЂ“ armor- Р В РЎвЂ”Р РЋР вЂљР В Р’ВµР В РўвЂР В РЎВР В Р’ВµР РЋРІР‚С™ Р В Р вЂ  Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™
         try {
             String itemId = "tacz:helmet".equals(gunId)
                     ? "minecraft:leather_helmet"
@@ -476,9 +513,6 @@ public class MatchManager {
         } catch (Exception ignored) {}
     }
 
-    /**
-     * Р В РЎСџР РЋР вЂљР В РЎвЂўР В Р вЂ Р В Р’ВµР РЋР вЂљР РЋР РЏР В Р’ВµР РЋРІР‚С™, Р В Р’ВµР РЋР С“Р РЋРІР‚С™Р РЋР Р‰ Р В Р’В»Р В РЎвЂ Р В РЎВР В Р’ВµР РЋР С“Р РЋРІР‚С™Р В РЎвЂў Р В Р вЂ  Р В РЎвЂР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР В Р’Вµ Р РЋР С“ Р РЋРЎвЂњР РЋРІР‚РЋР РЋРІР‚ВР РЋРІР‚С™Р В РЎвЂўР В РЎВ Р В Р’В»Р В РЎвЂР В РЎВР В РЎвЂР РЋРІР‚С™Р В Р’В° Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р В РЎвЂўР В Р вЂ .
-     */
     private boolean hasInventorySpace(ServerPlayer player) {
         int max = CSConfig.getMaxInventorySlots();
         var inv = player.getInventory();
@@ -531,7 +565,7 @@ public class MatchManager {
         pd.setLastBought(gunId);
     }
 
-    // ====================== Р В РЎв„ўР В Р’В°Р РЋР вЂљР РЋРІР‚С™Р РЋРІР‚в„– ======================
+    // ====================== Выбор карты ======================
 
     public void handleMapSelect(ServerPlayer player, String mapId) {
         if (phase != GamePhase.LOBBY) return;
@@ -552,7 +586,7 @@ public class MatchManager {
         startNewRound();
     }
 
-    // ====================== Р В Р в‚¬Р РЋРІР‚С™Р В РЎвЂР В Р’В»Р В РЎвЂР РЋРІР‚С™Р РЋРІР‚в„– ======================
+    // ====================== Утилиты ======================
 
     public void teleportToLobby(ServerPlayer player) {
         BlockPos lobby = MapConfig.getLobbySpawn();
@@ -560,27 +594,27 @@ public class MatchManager {
     }
 
     private void giveBaseLoadout(ServerPlayer player, PlayerData pd, GameMode mode) {
-        // Р В РЎвЂєР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’В°Р В Р’ВµР В РЎВ Р В РЎвЂР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋР Р‰ Р РЋРІР‚С™Р В РЎвЂўР В Р’В»Р РЋР Р‰Р В РЎвЂќР В РЎвЂў Р В Р вЂ  Р В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р вЂ Р В РЎвЂўР В РЎВ Р РЋР вЂљР В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р В РўвЂР В Р’Вµ.
-        // Р В РЎС™Р В Р’ВµР В Р’В¶Р В РўвЂР РЋРЎвЂњ Р РЋР вЂљР В Р’В°Р РЋРЎвЂњР В Р вЂ¦Р В РўвЂР В Р’В°Р В РЎВР В РЎвЂ Р В РЎвЂР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋР Р‰ Р РЋР С“Р В РЎвЂўР РЋРІР‚В¦Р РЋР вЂљР В Р’В°Р В Р вЂ¦Р РЋР РЏР В Р’ВµР РЋРІР‚С™Р РЋР С“Р РЋР РЏ (Р В РЎвЂ”Р В РЎвЂўР В РЎвЂќР РЋРЎвЂњР В РЎвЂ”Р В РЎвЂќР В РЎвЂ Р В РЎвЂўР РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂ№Р РЋРІР‚С™Р РЋР С“Р РЋР РЏ).
-        if (roundNumber == 1) {
+        // На первом раунде очищаем инвентарь (кроме keptItems)
+        if (roundNumber == 0) {
             clearInventoryKeeping(player);
         }
         List<String> weapons = mode.getStartWeapons(pd.getTeam());
         if (weapons == null || weapons.isEmpty()) {
-            // Р В РІР‚СњР В Р’ВµР РЋРІР‚С›Р В РЎвЂўР В Р’В»Р РЋРІР‚С™: Р В РЎвЂ”Р В РЎвЂР РЋР С“Р РЋРІР‚С™Р В РЎвЂўР В Р’В»Р В Р’ВµР РЋРІР‚С™ + Р В Р вЂ¦Р В РЎвЂўР В Р’В¶ Р В Р вЂ  Р РЋРІР‚В¦Р В РЎвЂўР РЋРІР‚С™Р В Р’В±Р В Р’В°Р РЋР вЂљ
+            // Стандартная стартовая экипировка: пистолет + нож
             TaczHelper.giveGunToSlot(player, pd.getTeam() == Team.T ? "tacz:glock_17" : "tacz:usp_45", 0);
-            TaczHelper.giveGunToSlot(player, "tacz:combat_knife", 1);
+            TaczHelper.giveGunToSlot(player, "tacz:combat_knife", 2);
             return;
         }
-        // Р В РЎв„ўР В Р’В»Р В Р’В°Р В РўвЂР РЋРІР‚ВР В РЎВ Р РЋР С“Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋРІР‚С™Р В РЎвЂўР В Р вЂ Р В РЎвЂўР В Р’Вµ Р В РЎвЂўР РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В РЎвЂР В Р’Вµ Р В Р вЂ  Р РЋР С“Р В Р’В»Р В РЎвЂўР РЋРІР‚С™Р РЋРІР‚в„– Р РЋРІР‚В¦Р В РЎвЂўР РЋРІР‚С™Р В Р’В±Р В Р’В°Р РЋР вЂљР В Р’В° Р В РЎвЂ”Р В РЎвЂў Р В РЎвЂ”Р В РЎвЂўР РЋР вЂљР РЋР РЏР В РўвЂР В РЎвЂќР РЋРЎвЂњ: 0, 1, 2...
-        // Р В РІР‚СћР РЋР С“Р В Р’В»Р В РЎвЂ Р В РЎвЂўР РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В РЎвЂР В РІвЂћвЂ“ Р В Р’В±Р В РЎвЂўР В Р’В»Р РЋР Р‰Р РЋРІвЂљВ¬Р В Р’Вµ Р РЋРІР‚РЋР В Р’ВµР В РЎВ 3 Р Р†Р вЂљРІР‚Сњ Р В Р’В»Р В РЎвЂР РЋРІвЂљВ¬Р В Р вЂ¦Р В Р’ВµР В Р’Вµ Р РЋРЎвЂњР РЋРІР‚В¦Р В РЎвЂўР В РўвЂР В РЎвЂР РЋРІР‚С™ Р В Р вЂ  Р В РЎвЂўР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“ Р В РЎвЂР В Р вЂ¦Р В Р вЂ Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°Р РЋР вЂљР РЋР Р‰.
-        int hotbarSlot = 0;
+        // Распределяем по слотам через SlotLayout
+        boolean[] occupied = new boolean[4];
         for (String gunId : weapons) {
-            if (hotbarSlot <= 8) {
-                if (TaczHelper.giveGunToSlot(player, gunId, hotbarSlot)) {
-                    hotbarSlot++;
-                } else {
+            String category = com.csedition.config.WeaponConfig.getCategory(gunId);
+            int slot = com.csedition.client.SlotLayout.slotFor(gunId, category, occupied);
+            if (slot >= 0 && slot < 4) {
+                if (!TaczHelper.giveGunToSlot(player, gunId, slot)) {
                     TaczHelper.giveGun(player, gunId);
+                } else {
+                    occupied[slot] = true;
                 }
             } else {
                 TaczHelper.giveGun(player, gunId);
@@ -591,16 +625,25 @@ public class MatchManager {
     public void sendMoneyUpdate(ServerPlayer player, PlayerData pd) {
         CSPackets.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                 new PacketMoneyUpdate(pd.getMoney(), pd.getKills(), pd.getDeaths()));
+        // Триггерим синк таблица — деньги изменились
+        sendScoreboardSync();
     }
 
     public void onPlayerKill(ServerPlayer victim, ServerPlayer killer) {
-        if (phase != GamePhase.FIGHTING) return;
-        GameMode mode = getCurrentMode();
+        // Учитываем смерть при ЛЮБОЙ фазе (LOBBY, BUY_TIME, FIGHTING),
+        // но начисляем награды и проверяем конец раунда только в FIGHTING
         PlayerData vd = get(victim.getUUID());
-        PlayerData kd = get(killer.getUUID());
         if (vd != null) vd.onDeath();
+
+        if (phase != GamePhase.FIGHTING) {
+            sendScoreboardSync();
+            return;
+        }
+        if (killer == null) return;
+        GameMode mode = getCurrentMode();
+        PlayerData kd = get(killer.getUUID());
         if (kd != null) kd.onKill(mode.getKillReward());
-        if (killer != null && kd != null) sendMoneyUpdate(killer, kd);
+        if (kd != null) sendMoneyUpdate(killer, kd);
         checkRoundEnd();
     }
 
@@ -619,10 +662,6 @@ public class MatchManager {
         return ServerPlayerLookup.get(uuid);
     }
 
-    /**
-     * Публичный static lookup игрока по UUID.
-     * Используется в обработчиках событий (MatchEvents) где нет инстанса MatchManager.
-     */
     public static ServerPlayer getServerPlayerStatic(UUID uuid) {
         return ServerPlayerLookup.get(uuid);
     }

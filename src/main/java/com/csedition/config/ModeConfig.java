@@ -73,7 +73,10 @@ public final class ModeConfig {
      * Вызывается из ServerEvents.onServerStarted.
      */
     public static void load() {
-        if (FMLEnvironment.dist == Dist.CLIENT) return;
+        // Load on both dedicated server and integrated server (singleplayer/LAN)
+        try {
+            if (net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer() == null) return;
+        } catch (Exception ignored) {}
         try {
             Path path = getConfigPath();
             currentFile = path.toString();
@@ -111,7 +114,9 @@ public final class ModeConfig {
      * Сохраняет режимы на диск (только сервер).
      */
     public static void save() {
-        if (FMLEnvironment.dist == Dist.CLIENT) return;
+        try {
+            if (net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer() == null) return;
+        } catch (Exception ignored) {}
         try {
             Path path = getConfigPath();
             Files.createDirectories(path.getParent());

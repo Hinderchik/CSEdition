@@ -3,8 +3,6 @@ package com.csedition.event;
 import com.csedition.data.GamePhase;
 import com.csedition.data.MapData;
 import com.csedition.data.PlayerData;
-import net.minecraftforge.event.TickEvent;
-import net.minecraft.world.phys.Vec3;
 import com.csedition.match.MatchManager;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
@@ -17,17 +15,15 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import java.util.UUID;
 
 /**
- * РЎРµСЂРІРµСЂРЅС‹Рµ СЃРѕР±С‹С‚РёСЏ РІРѕ РІСЂРµРјСЏ РјР°С‚С‡Р°:
- * - Р’РёР·СѓР°Р»РёР·Р°С†РёСЏ Р·РѕРЅС‹ РїРѕРєСѓРїРєРё: Р·РѕР»РѕС‚С‹Рµ С‡Р°СЃС‚РёС†С‹ РІ Р·РѕРЅРµ, СЃРµСЂС‹Р№ РґС‹Рј Р·Р° РїСЂРµРґРµР»Р°РјРё
- * - Kill feed: broadcast РІ С‡Р°С‚ "Killer в–ё Victim [weapon]"
- *
- * РћРїС‚РёРјРёР·Р°С†РёСЏ:
- * - Р§Р°СЃС‚РёС†С‹ С‚РёРєР°СЋС‚ СЂР°Р· РІ 10 С‚РёРєРѕРІ (2 СЂР°Р·Р°/СЃРµРє) вЂ” РїР»Р°РІРЅРѕ Рё РЅРµРґРѕСЂРѕРіРѕ
- * - Kill feed С€Р»С‘С‚СЃСЏ per-player С‡РµСЂРµР· РїСЂСЏРјРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ (РЅРµ broadcast-РїР°РєРµС‚)
+ * Серверные события во время матча:
+ * - визуализация зоны закупа: золотые частицы внутри, серый дым снаружи
+ * - kill feed: broadcast через прямое сообщение каждому игроку
  */
 public class MatchEvents {
 
     private static final int PARTICLE_INTERVAL = 10;
+    // Свой счётчик для частиц, не зависит от остающихся тиков фазы
+    private int particleTickCounter = 0;
 
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
@@ -36,20 +32,28 @@ public class MatchEvents {
         if (mm.getPhase() != GamePhase.BUY_TIME) return;
         MapData map = mm.getCurrentMap();
         if (map == null) return;
-        long tick = mm.getPhaseTicks();
-        if (tick % PARTICLE_INTERVAL != 0) return;
+
+        particleTickCounter++;
+        if (particleTickCounter % PARTICLE_INTERVAL != 0) return;
+
+        // Найти любой живой серверный уровень для частиц
+        ServerLevel level = null;
+        for (UUID uuid : mm.getPlayerDataMap().keySet()) {
+            ServerPlayer p = MatchManager.getServerPlayerStatic(uuid);
+            if (p != null) { level = p.serverLevel(); break; }
+        }
+        if (level == null) return;
 
         for (UUID uuid : mm.getPlayerDataMap().keySet()) {
             ServerPlayer p = MatchManager.getServerPlayerStatic(uuid);
             if (p == null) continue;
             PlayerData pd = mm.getOrCreate(p);
-            spawnZoneParticles(p, map, pd);
+            spawnZoneParticles(p, map, pd, level);
         }
     }
 
-    private void spawnZoneParticles(ServerPlayer player, MapData map, PlayerData pd) {
+    private void spawnZoneParticles(ServerPlayer player, MapData map, PlayerData pd, ServerLevel level) {
         boolean inZone = map.isInBuyZone(player.blockPosition(), pd.getTeam());
-        ServerLevel level = player.serverLevel();
         double x = player.getX();
         double y = player.getY() + 0.2;
         double z = player.getZ();
@@ -78,25 +82,6 @@ public class MatchEvents {
         for (UUID uuid : mm.getPlayerDataMap().keySet()) {
             ServerPlayer p = MatchManager.getServerPlayerStatic(uuid);
             if (p != null) p.sendSystemMessage(msg);
-        }
-    }
-
-    /**
-     * Во время BUY_TIME игроки не могут двигаться.
-     * Обнуляем X/Z компоненты движения каждый тик (сервер-авторитативно).
-     * Клиент тоже получит это через server-authoritative движение.
-     */
-    @SubscribeEvent
-    public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-        if (!(event.player instanceof net.minecraft.server.level.ServerPlayer player)) return;
-        MatchManager mm = MatchManager.getInstance();
-        if (mm.getPhase() != GamePhase.BUY_TIME) return;
-
-        Vec3 motion = player.getDeltaMovement();
-        if (motion.x != 0 || motion.z != 0) {
-            // Оставляем Y (gravity/falling), обнуляем горизонталь
-            player.setDeltaMovement(0.0, motion.y, 0.0);
         }
     }
 }

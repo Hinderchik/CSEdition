@@ -13,17 +13,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * GUI меню закупа. Открывается по B в фазе BUY_TIME.
- * Стиль CS: тёмные панели, оранжевые акценты, угловые элементы.
- * Оружие разделено по категориям (Pistols, SMGs, Rifles, Snipers, Heavy, Utility).
- * Всё процедурно — никаких PNG.
- *
- * Иконки оружия берутся через TaczHelper.createGun() — это гарантирует что
- * предмет рендерится с правильной текстурой (TaCZ определяет оружие по NBT GunId).
+ * Оружие рендерится из кэша — ItemStack создаётся один раз при инициализации.
  */
 public class BuyMenuScreen extends Screen {
     private static final int SLOT = 40;
@@ -36,9 +32,38 @@ public class BuyMenuScreen extends Screen {
 
     // Скролл
     private int scrollOffset = 0;
+    private int maxScroll = 0;
+
+    // Кэш предметных стеков: gunId -> ItemStack
+    private final Map<String, ItemStack> itemStackCache = new LinkedHashMap<>();
 
     public BuyMenuScreen() {
         super(Component.literal("Меню закупа"));
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        buildItemCache();
+        computeMaxScroll();
+    }
+
+    private void buildItemCache() {
+        itemStackCache.clear();
+        for (Map.Entry<String, Integer> e : GunPriceTable.getAll().entrySet()) {
+            String gunId = e.getKey();
+            if (!itemStackCache.containsKey(gunId)) {
+                ItemStack stack = TaczHelper.createGun(gunId);
+                itemStackCache.put(gunId, stack.isEmpty() ? ItemStack.EMPTY : stack);
+            }
+        }
+    }
+
+    private void computeMaxScroll() {
+        int totalH = CATEGORIES.length * (SLOT + 30);
+        int availableH = this.height - 80;
+        maxScroll = Math.max(0, totalH - availableH);
+        if (scrollOffset > maxScroll) scrollOffset = maxScroll;
     }
 
     @Override
@@ -54,14 +79,6 @@ public class BuyMenuScreen extends Screen {
         CSRenderUtil.csPanel(g, this.width / 2 - titleW / 2, 8, titleW, 26, null, font);
         CSRenderUtil.cornerAccents(g, this.width / 2 - titleW / 2, 8, titleW, 26, 6, CSRenderUtil.CS_ORANGE);
         g.drawCenteredString(font, title, this.width / 2, 16, CSRenderUtil.CS_ORANGE);
-
-        // Сколько предметов в каждой категории — для расчёта ширины строки
-        int maxRowWidth = 0;
-        for (String cat : CATEGORIES) {
-            int n = getItemsInCategory(cat).size();
-            int w = n * (SLOT + PADDING);
-            if (w > maxRowWidth) maxRowWidth = w;
-        }
 
         // Рисуем категории
         int catY = 50 - scrollOffset;
@@ -90,8 +107,8 @@ public class BuyMenuScreen extends Screen {
                 // Кнопка-слот
                 CSRenderUtil.csButton(g, slotX, slotY, SLOT, SLOT, "", hovered, font);
 
-                // Иконка предмета (центрирована) — через TaczHelper, чтобы был правильный рендер TaCZ
-                ItemStack stack = getItemStack(gunId);
+                // Иконка предмета из кэша
+                ItemStack stack = itemStackCache.getOrDefault(gunId, ItemStack.EMPTY);
                 if (!stack.isEmpty()) {
                     int iconX = slotX + (SLOT - 16) / 2;
                     int iconY = slotY + 4;
@@ -133,9 +150,8 @@ public class BuyMenuScreen extends Screen {
                         CSPackets.CHANNEL.sendToServer(new PacketBuyGun(gunId));
                         this.onClose();
                     } else {
-                        // Маленький визуальный отклик — даже без покупки
                         this.minecraft.player.displayClientMessage(
-                                Component.literal("§cНедостаточно денег: $" + price), true);
+                                Component.literal("\u00A7c\u00A7lНедостаточно денег: $\u00A7r" + price), true);
                     }
                     return true;
                 }
@@ -148,14 +164,16 @@ public class BuyMenuScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        int totalH = CATEGORIES.length * (SLOT + 30);
-        int availableH = this.height - 80;
-        int maxScroll = Math.max(0, totalH - availableH);
         int step = (SLOT + 30) / 2;
         int old = scrollOffset;
         if (delta > 0) scrollOffset = Math.max(0, scrollOffset - step);
         else if (delta < 0) scrollOffset = Math.min(maxScroll, scrollOffset + step);
         return old != scrollOffset;
+    }
+
+    @Override
+    public void resize(net.minecraft.client.Minecraft mc, int width, int height) {
+        computeMaxScroll();
     }
 
     private List<Map.Entry<String, Integer>> getItemsInCategory(String category) {
@@ -166,17 +184,6 @@ public class BuyMenuScreen extends Screen {
             }
         }
         return result;
-    }
-
-    /**
-     * Создаёт ItemStack оружия для отображения иконки.
-     * Используем TaczHelper.createGun — он возвращает предмет с правильным
-     * base item (tacz:modern_kinetic_gun) и NBT GunId, по которому TaCZ
-     * выбирает модель и текстуру.
-     */
-    private ItemStack getItemStack(String gunId) {
-        ItemStack stack = TaczHelper.createGun(gunId);
-        return stack.isEmpty() ? ItemStack.EMPTY : stack;
     }
 
     @Override

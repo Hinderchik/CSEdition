@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 @Mod(CSEditionMod.MODID)
 public class CSEditionMod {
     public static final String MODID = "csedition";
+    public static final String VERSION = "1.2.57";
     public static final Logger LOGGER = LoggerFactory.getLogger(MODID);
 
     private final IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -37,8 +38,6 @@ public class CSEditionMod {
                 new net.minecraftforge.common.ForgeConfigSpec.Builder().build(),
                 "csedition-common.toml");
 
-        // MapConfig.load() РІС‹Р·С‹РІР°РµС‚СЃСЏ РІ ServerEvents.onServerStarted,
-        // РєРѕРіРґР° РјРёСЂ СѓР¶Рµ РґРѕСЃС‚СѓРїРµРЅ (РЅСѓР¶РµРЅ РїСѓС‚СЊ Рє РїР°РїРєРµ РјРёСЂР°)
         LOGGER.info("[CS-Edition] Mod initialized.");
     }
 
@@ -51,9 +50,14 @@ public class CSEditionMod {
 
     private void clientSetup(final FMLClientSetupEvent event) {
         if (FMLEnvironment.dist == Dist.CLIENT) {
-            MinecraftForge.EVENT_BUS.register(new com.csedition.client.hud.CSHudOverlay());
+            MinecraftForge.EVENT_BUS.register(com.csedition.client.hud.CSHudOverlay.getInstance());
             MinecraftForge.EVENT_BUS.register(new com.csedition.client.input.InputHandler());
+            com.csedition.client.hud.CrosshairOverlay.getInstance();
+            com.csedition.client.hud.CsScoreboardOverlay.getInstance();
+            com.csedition.client.screen.CsMainMenuScreen.registerClientSetup(event);
             modBus.addListener(com.csedition.client.keybind.KeyBindings::onRegister);
+            com.csedition.config.CrosshairConfig cfg = com.csedition.config.CrosshairConfig.load();
+            com.csedition.client.hud.CrosshairOverlay.setConfig(cfg);
             LOGGER.info("[CS-Edition] Client setup complete.");
         }
     }

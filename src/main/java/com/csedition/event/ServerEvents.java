@@ -7,7 +7,6 @@ import com.csedition.config.ModeConfig;
 import com.csedition.config.WeaponConfig;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
-import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 /**
@@ -25,16 +24,6 @@ public class ServerEvents {
     @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
         CSEditionMod.LOGGER.info("[CS-Edition] Server started, loading configs...");
-        WeaponConfig.load();
-        MapConfig.load();
-        ModeConfig.load();
-        CSConfig.load();
-    }
-
-    @SubscribeEvent
-    public void onLevelLoad(LevelEvent.Load event) {
-        if (event.getLevel().isClientSide()) return;
-        CSEditionMod.LOGGER.info("[CS-Edition] Level loaded, reloading configs...");
         WeaponConfig.load();
         MapConfig.load();
         ModeConfig.load();

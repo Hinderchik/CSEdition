@@ -1,0 +1,8 @@
+Manifest-Version: 1.0
+Specification-Title: csedition
+Specification-Vendor: Hinderchik
+Specification-Version: 1
+Implementation-Title: cs-edition
+Implementation-Version: 1.2.57
+Implementation-Vendor: Hinderchik
+

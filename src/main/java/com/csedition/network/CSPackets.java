@@ -47,5 +47,7 @@ public class CSPackets {
                 PacketSyncModes::encode, PacketSyncModes::decode, PacketSyncModes::handle);
         CHANNEL.registerMessage(id++, PacketRoundEnd.class,
                 PacketRoundEnd::encode, PacketRoundEnd::decode, PacketRoundEnd::handle);
+        CHANNEL.registerMessage(id++, PacketScoreboardSync.class,
+                PacketScoreboardSync::encode, PacketScoreboardSync::decode, PacketScoreboardSync::handle);
     }
 }

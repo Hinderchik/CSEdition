@@ -5,7 +5,7 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '6.0.16', changing: true
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '6.0.25', changing: true
     }
 }
 
@@ -103,6 +103,10 @@ jar {
             "Implementation-Version"  : project.jar.archiveVersion,
             "Implementation-Vendor"   : mod_authors
         ])
+    }
+    duplicatesStrategy = 'exclude'
+    from(sourceSets.main.resources) {
+        include "assets/**"
     }
 }
 

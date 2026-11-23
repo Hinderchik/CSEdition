@@ -29,6 +29,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
  * 4  — быстрая закупка (снаряжение)
  * F  — осмотреть оружие
  * N  — переключить ночное зрение
+ * F8 — настройки прицела
  */
 @OnlyIn(Dist.CLIENT)
 public class InputHandler {
@@ -47,7 +48,7 @@ public class InputHandler {
 
         // === Меню ===
         // B: в лобби — выбор карты (с фильтром по выбранному режиму), в BUY_TIME — меню закупа
-        if (KeyBindings.OPEN_BUY_MENU.consumeClick()) {
+        if (KeyBindings.OPEN_BUY_MENU().consumeClick()) {
             if (phase == GamePhase.LOBBY) {
                 mc.setScreen(new MapSelectScreen(ClientState.getSelectedModeId()));
             } else if (phase == GamePhase.BUY_TIME) {
@@ -56,18 +57,18 @@ public class InputHandler {
         }
 
         // M: в лобби — выбор режима (двухшаговый выбор)
-        if (KeyBindings.OPEN_MAP_SELECT.consumeClick()) {
+        if (KeyBindings.OPEN_MAP_SELECT().consumeClick()) {
             if (phase == GamePhase.LOBBY) {
                 mc.setScreen(new ModeSelectScreen(null));
             }
         }
 
         // === Действия с оружием ===
-        if (KeyBindings.DROP_WEAPON.consumeClick()) {
+        if (KeyBindings.DROP_WEAPON().consumeClick()) {
             dropCurrentWeapon(mc.player);
         }
 
-        if (KeyBindings.INSPECT_WEAPON.consumeClick()) {
+        if (KeyBindings.INSPECT_WEAPON().consumeClick()) {
             // Осмотр оружия — визуальный эффект, реализуется через анимацию TaCZ
             // Здесь можно отправить пакет на сервер для синхронизации анимации
             mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
@@ -75,23 +76,28 @@ public class InputHandler {
 
         // === Быстрая закупка (только в BUY_TIME) ===
         if (phase == GamePhase.BUY_TIME) {
-            if (KeyBindings.QUICK_BUY_LAST.consumeClick()) {
+            if (KeyBindings.QUICK_BUY_LAST().consumeClick()) {
                 CSPackets.CHANNEL.sendToServer(new PacketQuickBuy(PacketQuickBuy.Type.LAST));
             }
-            if (KeyBindings.QUICK_BUY_PRIMARY.consumeClick()) {
+            if (KeyBindings.QUICK_BUY_PRIMARY().consumeClick()) {
                 CSPackets.CHANNEL.sendToServer(new PacketQuickBuy(PacketQuickBuy.Type.PRIMARY));
             }
-            if (KeyBindings.QUICK_BUY_SECONDARY.consumeClick()) {
+            if (KeyBindings.QUICK_BUY_SECONDARY().consumeClick()) {
                 CSPackets.CHANNEL.sendToServer(new PacketQuickBuy(PacketQuickBuy.Type.SECONDARY));
             }
-            if (KeyBindings.QUICK_BUY_UTILITY.consumeClick()) {
+            if (KeyBindings.QUICK_BUY_UTILITY().consumeClick()) {
                 CSPackets.CHANNEL.sendToServer(new PacketQuickBuy(PacketQuickBuy.Type.UTILITY));
             }
         }
 
         // === Ночное зрение ===
-        if (KeyBindings.TOGGLE_NIGHT_VISION.consumeClick()) {
+        if (KeyBindings.TOGGLE_NIGHT_VISION().consumeClick()) {
             toggleNightVision(mc.player);
+        }
+
+        // === Настройки прицела (F8) ===
+        if (KeyBindings.OPEN_CROSSHAIR_CONFIG().consumeClick()) {
+            mc.setScreen(new com.csedition.client.screen.CrosshairConfigScreen(false));
         }
     }
 

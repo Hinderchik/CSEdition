@@ -342,15 +342,27 @@ public class MapConfig {
 
     /**
      * Устанавливает зону закупа для команды.
-     * Y автоматически ставится от -60 до 222 (полная высота мира),
+     * Y берётся из границ мира (level.getMinBuildHeight()/getMaxBuildHeight()).
      * XZ берётся из переданных точек.
      */
     public static void setBuyZone(String mapId, Team team, BlockPos min, BlockPos max) {
         MapData m = MAPS.get(mapId);
         if (m == null) return;
-        // Y всегда от -60 до 222, XZ — из выбранных точек
-        BlockPos realMin = new BlockPos(min.getX(), MapData.BUY_ZONE_Y_MIN, min.getZ());
-        BlockPos realMax = new BlockPos(max.getX(), MapData.BUY_ZONE_Y_MAX, max.getZ());
+        // Y берём из реальных границ мира (1.20.1: -64..320)
+        int minY = -64;
+        int maxY = 320;
+        try {
+            var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            if (server != null) {
+                var level = server.overworld();
+                if (level != null) {
+                    minY = level.getMinBuildHeight();
+                    maxY = level.getMaxBuildHeight();
+                }
+            }
+        } catch (Exception ignored) {}
+        BlockPos realMin = new BlockPos(min.getX(), minY, min.getZ());
+        BlockPos realMax = new BlockPos(max.getX(), maxY, max.getZ());
         MapData updated = new MapData(m.getId(), m.getDisplayName(),
                 m.getTSpawns(), m.getCtSpawns(),
                 team == Team.T ? realMin : m.getTBuyZoneMin(),

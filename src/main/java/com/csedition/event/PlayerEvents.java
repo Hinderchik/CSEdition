@@ -3,14 +3,12 @@ package com.csedition.event;
 import com.csedition.data.GamePhase;
 import com.csedition.match.MatchManager;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 /**
  * Серверные события игроков.
- * Подписан на шину Forge (зарегистрирован в CSEditionMod).
  */
 public class PlayerEvents {
 
@@ -29,28 +27,28 @@ public class PlayerEvents {
     }
 
     /**
-     * В лобби отключаем любой урон.
+     * В лобби отключаем урон только для ServerPlayer (не для клиента).
      */
     @SubscribeEvent
     public void onLivingHurt(net.minecraftforge.event.entity.living.LivingHurtEvent event) {
         if (MatchManager.getInstance().getPhase() == GamePhase.LOBBY) {
-            if (event.getEntity() instanceof Player) {
+            if (event.getEntity() instanceof ServerPlayer) {
                 event.setCanceled(true);
             }
         }
     }
 
     /**
-     * Обработка убийств — начисление денег, проверка конца раунда.
+     * Обработка убийств — вызывает onPlayerKill в MatchManager.
+     * Там обрабатываются смерти при любой фазе, но награды/конец раунда — только в FIGHTING.
      */
     @SubscribeEvent
     public void onLivingDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer victim)) return;
-        if (event.getSource().getEntity() instanceof ServerPlayer killer) {
-            MatchManager.getInstance().onPlayerKill(victim, killer);
-        } else {
-            // Умер не от игрока — просто отметим как мёртвого
-            MatchManager.getInstance().onPlayerKill(victim, null);
+        ServerPlayer killer = null;
+        if (event.getSource().getEntity() instanceof ServerPlayer k) {
+            killer = k;
         }
+        MatchManager.getInstance().onPlayerKill(victim, killer);
     }
 }

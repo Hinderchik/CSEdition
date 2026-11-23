@@ -14,9 +14,9 @@ import java.util.List;
  */
 public class MapData {
     /** Минимальная Y-координата зоны закупа (всегда). */
-    public static final int BUY_ZONE_Y_MIN = -60;
+    public static final int BUY_ZONE_Y_MIN = Integer.MIN_VALUE;
     /** Максимальная Y-координата зоны закупа (всегда). */
-    public static final int BUY_ZONE_Y_MAX = 222;
+    public static final int BUY_ZONE_Y_MAX = Integer.MAX_VALUE;
 
     private final String id;
     private final String displayName;
@@ -86,7 +86,7 @@ public class MapData {
 
     /**
      * Проверяет, находится ли позиция внутри зоны закупа для указанной команды.
-     * Y всегда проверяется от -60 до 222, XZ — по выбранным точкам.
+     * Y проверяется от minBuildHeight до maxBuildHeight мира (1.20.1: -64..320).
      */
     public boolean isInBuyZone(BlockPos pos, Team team) {
         BlockPos min, max;
@@ -98,8 +98,6 @@ public class MapData {
             max = ctBuyZoneMax;
         }
         if (min == null || max == null) return false;
-        // Y всегда от -60 до 222
-        if (pos.getY() < BUY_ZONE_Y_MIN || pos.getY() > BUY_ZONE_Y_MAX) return false;
         // XZ — по выбранным точкам
         return pos.getX() >= Math.min(min.getX(), max.getX())
             && pos.getX() <= Math.max(min.getX(), max.getX())

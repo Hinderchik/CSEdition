@@ -2,10 +2,10 @@ package com.csedition.mixin;
 
 import com.csedition.client.render.CSRenderUtil;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.OptionsScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -14,40 +14,25 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Стилизует PauseScreen под тёмную тему CS.
- * remap = false — в Forge 1.20.1 с official mappings имена уже deobfuscated.
- * Миксин extends Screen → protected методы доступны через this.
+ * Рендер фона — в renderBackground через событие, не отменяем стандартный рендер кнопок.
  */
 @Mixin(value = PauseScreen.class, remap = false)
-public abstract class MixinPauseScreen extends Screen {
+public abstract class MixinPauseScreen extends net.minecraft.client.gui.screens.Screen {
 
     protected MixinPauseScreen(Component title) {
         super(title);
     }
 
-    @Inject(method = "init", at = @At("TAIL"), remap = false)
-    private void cs$restyle(CallbackInfo ci) {
-        this.clearWidgets();
-        Minecraft mc = Minecraft.getInstance();
-        int cx = this.width / 2;
-        int y = this.height / 2;
-        this.addRenderableWidget(Button.builder(
-                Component.literal("Вернуться в игру"),
-                b -> mc.setScreen(null))
-                .bounds(cx - 120, y - 40, 240, 28).build());
-        this.addRenderableWidget(Button.builder(
-                Component.literal("Настройки"),
-                b -> mc.setScreen(new OptionsScreen((PauseScreen)(Object)this, mc.options)))
-                .bounds(cx - 120, y - 8, 240, 28).build());
-        this.addRenderableWidget(Button.builder(
-                Component.literal("Отключиться"),
-                b -> mc.level.disconnect())
-                .bounds(cx - 120, y + 24, 240, 28).build());
-    }
-
-    @Inject(method = "render", at = @At("TAIL"), remap = false)
-    private void cs$render(net.minecraft.client.gui.GuiGraphics g, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+    @Inject(method = "renderBackground", at = @At("HEAD"), cancellable = true)
+    private void cs$renderBackground(GuiGraphics g, CallbackInfo ci) {
+        // Отменяем только фоновую текстуру/градиент, сохраняя кнопки
         g.fill(0, 0, this.width, this.height, 0xEE050505);
         CSRenderUtil.scanlines(g, 0, 0, this.width, this.height, 3);
+        ci.cancel();
+    }
+
+    @Inject(method = "render", at = @At("TAIL"))
+    private void cs$overlay(GuiGraphics g, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         String title = "PAUSED";
         var font = Minecraft.getInstance().font;
         int titleW = font.width(title) + 40;

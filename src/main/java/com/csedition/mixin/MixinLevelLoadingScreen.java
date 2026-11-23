@@ -13,35 +13,32 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.function.Supplier;
+
 /**
  * Миксин для замены фона экрана загрузки мира/сервера (LevelLoadingScreen).
- *
- * Это НЕ Forge LoadingOverlay (ранний загрузочный экран) — это игровой экран,
- * который показывается при входе в мир или подключении к серверу.
- * Трогать раннюю загрузку запрещено, а этот экран — обычный игровой Screen.
- *
- * Использует текстуру assets/csedition/textures/gui/loading_background.png
- * (положите свой start.jpg/png туда).
+ * ResourceLocation ленивый — никакой инициализации на стадии sided_setup.
  */
 @Mixin(value = LevelLoadingScreen.class, remap = false)
 public class MixinLevelLoadingScreen {
 
-    private static final ResourceLocation CUSTOM_BG =
-            new ResourceLocation("csedition", "textures/gui/loading_background.png");
+    // Ленивый ResourceLocation — создаётся только при первом обращении
+    private static final java.util.function.Supplier<ResourceLocation> CUSTOM_BG =
+            () -> new ResourceLocation("csedition", "textures/gui/loading_background.png");
 
     /**
      * Полностью заменяет стандартный фон на нашу текстуру.
-     * Вызывается в начале render() — оригинальный метод отменяется.
      */
-    @Inject(method = "render", at = @At("HEAD"), cancellable = true, remap = false)
+    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
     private void csEdition$drawCustomBackground(net.minecraft.client.gui.GuiGraphics g, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         int width = mc.getWindow().getGuiScaledWidth();
         int height = mc.getWindow().getGuiScaledHeight();
 
-        RenderSystem.disableBlend();
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        RenderSystem.setShaderTexture(0, CUSTOM_BG);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderTexture(0, CUSTOM_BG.get());
 
         Tesselator tesselator = Tesselator.getInstance();
         BufferBuilder buffer = tesselator.getBuilder();
@@ -52,7 +49,9 @@ public class MixinLevelLoadingScreen {
         buffer.vertex(0.0, 0.0, 0.0).uv(0.0F, 0.0F).endVertex();
         BufferUploader.drawWithShader(buffer.end());
 
-        // Отменяем оригинальный метод — наш фон уже нарисован
+        RenderSystem.disableBlend();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
         ci.cancel();
     }
 }

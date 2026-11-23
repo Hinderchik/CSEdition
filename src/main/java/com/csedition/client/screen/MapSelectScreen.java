@@ -469,7 +469,8 @@ public class MapSelectScreen extends Screen {
         if (delta > 0) scrollOffset = Math.max(0, scrollOffset - step);
         else if (delta < 0) scrollOffset = Math.min(maxScroll, scrollOffset + step);
         if (old != scrollOffset) {
-            rebuildWidgets();
+            // Не пересоздаём виджеты — просто обновляем maxScroll при ресайзе
+            computeLayout();
             return true;
         }
         return false;
@@ -484,6 +485,12 @@ public class MapSelectScreen extends Screen {
             }
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void resize(net.minecraft.client.Minecraft mc, int width, int height) {
+        super.resize(mc, width, height);
+        computeLayout();
     }
 
     @Override
